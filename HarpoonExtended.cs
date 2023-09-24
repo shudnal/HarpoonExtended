@@ -53,7 +53,6 @@ namespace HarpoonExtended
         private static ConfigEntry<float> breakDistance;
         private static ConfigEntry<float> maxDistance;
         private static ConfigEntry<float> drainStamina;
-        private static ConfigEntry<float> maxLineSlack;
         private static ConfigEntry<float> minDistanceShip;
         private static ConfigEntry<float> minDistanceCreature;
         private static ConfigEntry<float> minDistanceItem;
@@ -65,6 +64,7 @@ namespace HarpoonExtended
         private static ConfigEntry<float> pullForceMultiplier;
         private static ConfigEntry<float> forcePower;
         private static ConfigEntry<bool> useForce;
+        private static ConfigEntry<bool> alwaysPullTo;
 
         private static ConfigEntry<float> projectileGravityMiltiplier;
         private static ConfigEntry<float> hitboxSize;
@@ -73,7 +73,10 @@ namespace HarpoonExtended
         private static ConfigEntry<int> maxQuality;
         private static ConfigEntry<float> durabilityPerLevel;
         private static ConfigEntry<bool> disableDurability;
+        private static ConfigEntry<float> durabilityDrain;
+        private static ConfigEntry<float> attackStamina;
         private static ConfigEntry<bool> disableDamage;
+        private static ConfigEntry<bool> disableStamina;
 
         private static ConfigEntry<KeyboardShortcut> shortcutPull;
         private static ConfigEntry<KeyboardShortcut> shortcutPullTo;
@@ -118,23 +121,23 @@ namespace HarpoonExtended
 
         public static GameObject targetHarpooned;
 
-        public static Vector3 harpoonHitPoint;
-
         public static string targetName;
 
         public static bool noUpForce;
 
         public static Transform target;
 
-        public static Vector3 targetPoint;
-
         public static ZNetView m_nview;
 
         public static Ship m_ship;
 
+        public static Character m_character;
+
         public static float mass;
 
         public static LineRenderer m_lineRenderer;
+
+        public static bool isPullingTo;
 
         public static bool castSlowFall = false;
         public static bool playerDropped = false;
@@ -166,68 +169,70 @@ namespace HarpoonExtended
 
         private void ConfigInit()
         {
-            config("General", "NexusID", 2528, "Nexus mod ID for updates", false);
+            config("1 - General", "NexusID", 2528, "Nexus mod ID for updates", false);
 
-            modEnabled = config("General", "Enabled", defaultValue: true, "Enable the mod");
-            configLocked = config("General", "Lock Configuration", defaultValue: true, "Configuration is locked and can be changed by server admins only.");
-            
-            loggingEnabled = config("Logging", "Enabled logging", defaultValue: false, "Enable logging for debug events. [Not Synced with Server]", false);
-            deepLoggingEnabled = config("Logging", "Enabled deep logging", defaultValue: false, "Enable deep logging for debug physics events. [Not Synced with Server]", false);
-           
-            messagesEnabled = config("Messages", "Enabled harpooning messages", defaultValue: true, "Enable localized notification of current state. [Not Synced with Server]", false);
-            targetMessagesEnabled = config("Messages", "Enabled harpooning target message for all objects", defaultValue: false, "Enable unlocalized target name for any object you hit. [Not Synced with Server]", false);
+            modEnabled = config("1 - General", "Enabled", defaultValue: true, "Enable the mod");
+            configLocked = config("1 - General", "Lock Configuration", defaultValue: true, "Configuration is locked and can be changed by server admins only.");
+            loggingEnabled = config("1 - General", "Logging enabled", defaultValue: false, "Enable logging for debug events. [Not Synced with Server]", false);
 
-            timeBeforeStop = config("Misc", "Time before harpoon can be dropped", defaultValue: 1.0f, "Time in seconds the harpoon should exists before it can be released. To prevent spam mistakes. [Not Synced with Server]", false);
-            applySlowFall = config("Misc", "Apply Feather Fall while harpooning around", defaultValue: true, "Apply Feather Fall while using the harpoon to prevent fall damage");
+            targetCreatures = config("2 - Targets", "Creatures (override)", defaultValue: true, "Enable pulling creatures. Overrides vanilla behaviour. Restart required after change.");
+            targetShip = config("2 - Targets", "Ship", defaultValue: true, "Enable pulling ships.");
+            targetTreeLog = config("2 - Targets", "Tree log", defaultValue: true, "Enable pulling logs.");
+            targetTreeBase = config("2 - Targets", "Trees", defaultValue: true, "Enable pulling to trees.");
+            targetFish = config("2 - Targets", "Fish", defaultValue: true, "Enable pulling fish.");
+            targetPiece = config("2 - Targets", "Buildings", defaultValue: true, "Enable pulling to buildings.");
+            targetDestructibles = config("2 - Targets", "Destructibles", defaultValue: true, "Enable pulling to destructibles.");
+            targetLeviathan = config("2 - Targets", "Leviathan", defaultValue: false, "Enable pulling a Leviathan. Use with caution. Can cause deadly effect");
+            targetItems = config("2 - Targets", "Items", defaultValue: true, "Enable pulling an items. Fish considered as item.");
+            targetBosses = config("2 - Targets", "Bosses", defaultValue: false, "Enable pulling a boss.");
+            targetGround = config("2 - Targets", "Any target", defaultValue: false, "Track any hitpoint. Every hit collision. Terrain included.");
 
-            targetPulling = config("Pull", "Enable pulling", defaultValue: true, "Enable pulling harpooned target. Alternative action button to release the line. Pulling speed depends on weight difference.");
-            pullSpeedMultiplier = config("Pull", "Harpoon line casting and retrieving speed multiplier", defaultValue: 1.0f, "Speed of line casting and retrieving");
-            maxBodyMassToPull = config("Pull", "Maximum body mass you can pull", defaultValue: 1000.0f, "Objects with mass more than set will not be pulled but instead pull you to them." +
-                                                                                                        "\nLeviathan mass is 1000, Lox 60, Serpent 30. Longship 2000. Karve and raft 1000.");
-            containerInventoryWeightMassFactor = config("Pull", "Pulled container inventory weight mass factor", defaultValue: 0.1f, "If pulled object contains inventory, like CargoCrate, the inventory total weight will be multiplied by that factor.");
+            messagesEnabled = config("6 - Misc", "Enabled harpooning messages", defaultValue: true, "Enable localized notification of current state. [Not Synced with Server]", false);
+            timeBeforeStop = config("6 - Misc", "Time before harpoon can be dropped", defaultValue: 1.0f, "Time in seconds the harpoon should exists before it can be released. To prevent spam mistakes. [Not Synced with Server]", false);
+            applySlowFall = config("6 - Misc", "Apply Feather Fall while harpooning around", defaultValue: true, "Apply Feather Fall while using the harpoon to prevent fall damage");
+            drainStamina = config("6 - Misc", "Stamina drain multiplier", defaultValue: 1.0f, "Stamina drain for target pulling.");
 
+            targetPulling = config("3 - Pull", "Enable pulling", defaultValue: true, "Enable active pulling harpooned target or yourself. Hold Use button to retrieve line or Crouch + Use buttons to cast line.");
+            pullSpeedMultiplier = config("3 - Pull", "Harpoon line casting and retrieving speed multiplier", defaultValue: 1.0f, "Speed of line casting and retrieving");
+            maxBodyMassToPull = config("3 - Pull", "Maximum mass you can pull", defaultValue: 1000.0f, "Objects with mass more than set will not be pulled but instead you will be pulled to them." +
+                                                                                                   "\nLeviathan mass is 1000, Lox 60, Serpent 30. Ships excluded from this restriction." +
+                                                                                                   "\nContainers and items weight depends on \"Pulled container inventory weight mass factor\"");
+            containerInventoryWeightMassFactor = config("3 - Pull", "Pulled container inventory weight mass factor", defaultValue: 0.1f, "If pulled object contains inventory, like CargoCrate, the inventory total weight will be multiplied by that factor." +
+                                                                                                                                     "\nThis calculation also applies to pulling items but this effect is mostly negligible except some heavy stack");
 
-            targetCreatures = config("Pull targets", "Creatures (override)", defaultValue: true, "Enable pulling creatures. Overrides vanilla behaviour. Restart required after change.");
-            targetShip = config("Pull targets", "Ship", defaultValue: true, "Enable pulling ships.");
-            targetTreeLog = config("Pull targets", "Tree log", defaultValue: true, "Enable pulling logs.");
-            targetTreeBase = config("Pull targets", "Trees", defaultValue: true, "Enable pulling to trees.");
-            targetFish = config("Pull targets", "Fish", defaultValue: true, "Enable pulling fish.");
-            targetPiece = config("Pull targets", "Buildings", defaultValue: true, "Enable pulling to buildings.");
-            targetDestructibles = config("Pull targets", "Destructibles", defaultValue: true, "Enable pulling to destructibles.");
-            targetLeviathan = config("Pull targets", "Leviathan", defaultValue: false, "Enable pulling a Leviathan. Use with caution. Can cause fun effect");
-            targetItems = config("Pull targets", "Items", defaultValue: true, "Enable pulling a item on the ground. Fish considered as item. Use with caution. Can cause fun effect");
-            targetBosses = config("Pull targets", "Bosses", defaultValue: false, "Enable pulling a boss.");
-            targetGround = config("Pull targets", "Any target", defaultValue: false, "Track any hitpoint. Every hit collision.");
-
-            breakDistance = config("Stats - Line", "Break distance", defaultValue: 15f, "Line will break if distance between you and target will be more than line length + break distance.");
-            maxDistance = config("Stats - Line", "Max distance", defaultValue: 50f, "Max distance. Balanced is 100. Big numbers (>200) will work but may cause unwanted net code effects.");
-            maxLineSlack = config("Stats - Line", "Max line slack", defaultValue: 0.3f, "Stamina drain. Better to relog to apply after change.");
-            minDistanceShip = config("Stats - Line", "Min distance (Ship)", defaultValue: 5f, "Minimal distance where the line broke to avoid unwanted collisions (Ships)");
-            minDistanceCreature = config("Stats - Line", "Min distance (Creature)", defaultValue: 0.5f, "Minimal distance where the line broke to avoid unwanted collisions (living creatures)");
-            minDistanceItem = config("Stats - Line", "Min distance (Item)", defaultValue: 0.1f, "Minimal distance where the line broke to avoid unwanted collisions (items)");
-            minDistancePullToTarget = config("Stats - Line", "Min distance (pull to target)", defaultValue: 1f, "Minimal distance where the line broke to avoid unwanted collisions (When pulling player to general target)");
-            minDistancePullToPlayer = config("Stats - Line", "Min distance (pull to player)", defaultValue: 2f, "Minimal distance where the line broke to avoid unwanted collisions (When pulling general target to player)");
+            breakDistance = config("4 - Line", "Break distance", defaultValue: 15f, "Line will break if distance between you and target will be more than target line length + break distance.");
+            maxDistance = config("4 - Line", "Max distance", defaultValue: 50f, "Max distance. Balanced is 100. Big numbers (>200) will work but may cause unwanted net code effects.");
+            minDistanceShip = config("4 - Line", "Min distance (Ship)", defaultValue: 5f, "Minimal distance where the line broke to avoid unwanted collisions (Ships)");
+            minDistanceCreature = config("4 - Line", "Min distance (Creature)", defaultValue: 0.5f, "Minimal distance where the line broke to avoid unwanted collisions (living creatures)");
+            minDistanceItem = config("4 - Line", "Min distance (Item)", defaultValue: 0.1f, "Minimal distance where the line broke to avoid unwanted collisions (items)");
+            minDistancePullToTarget = config("4 - Line", "Min distance (pull to target)", defaultValue: 1f, "Minimal distance where the line broke to avoid unwanted collisions (When pulling player to general target)");
+            minDistancePullToPlayer = config("4 - Line", "Min distance (pull to player)", defaultValue: 2f, "Minimal distance where the line broke to avoid unwanted collisions (When pulling general target to player)");
        
-            pullSpeed = config("Stats - Force", "Pull speed", defaultValue: 1000f, "[Math] Pull speed of static line. Used in velocity math. No actual need to mess with it.");
-            pullForceMultiplier = config("Stats - Force", "Pull force multiplier", defaultValue: 1f, "[Math] Pull force multiplier. Depends on moved body mass. No actual need to mess with it.");
-            smoothDistance = config("Stats - Force", "Smooth distance", defaultValue: 2f, "[Math] Makes the applied force smoother. No actual need to mess with it.");
-            forcePower = config("Stats - Force", "Force power", defaultValue: 1f, "[Math] Power (exponentiation part) of the actual force. No actual need to mess with it.");
-            useForce = config("Stats - Force", "Use force", defaultValue: true, "[Math] If true - pull physics use force applied to moved body. If false - uses velocity calculation. No actual need to mess with it.");
-            drainStamina = config("Stats - Force", "Stamina drain", defaultValue: 0.1f, "Stamina drain.");
+            maxQuality = config("5 - Item", "Max quality", defaultValue: 4, "Maximum quality level");
+            durabilityPerLevel = config("5 - Item", "Durability per level", defaultValue: 100f, "Durability added per level");
+            durabilityDrain = config("5 - Item", "Durability drain on attack", defaultValue: 1f, "Durability drain on usage");
+            attackStamina = config("5 - Item", "Stamina drain on attack", defaultValue: 15f, "Stamina drain on usage");
+            disableDurability = config("5 - Item", "Disable harpoon durability usage", defaultValue: false, "Make harpoon to not use durability");
+            disableDamage = config("5 - Item", "Disable harpoon damage", defaultValue: false, "Make harpoon to deal no damage. Handy to ride a deathsquito without killing it. Or even birds.");
+            disableStamina = config("5 - Item", "Disable harpoon stamina usage", defaultValue: false, "Make harpoon to not use stamina.");
+            projectileGravityMiltiplier = config("5 - Item", "Projectile gravity multiplier", defaultValue: 1.0f, "Multiplier of gravity affecting harpoon projectile");
+            projectileVelocityMultiplier = config("5 - Item", "Projectile velocity multiplier", defaultValue: 1.0f, "Basically speed of initial harpoon flight");
 
-            projectileGravityMiltiplier = config("Stats - Projectile", "Projectile gravity multiplier", defaultValue: 1.0f, "Multiplier of gravity affecting harpoon projectile");
-            hitboxSize = config("Stats - Projectile", "Hitbox size", 0.0f, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
-            projectileVelocityMultiplier = config("Stats - Projectile", "Velocity multiplier", 1.0f, "Basically speed of initial harpoon flight");
+            shortcutPull = config("7 - Shortcuts", "Pull", defaultValue: new KeyboardShortcut(KeyCode.T), "Pull target closer if applicable [Not Synced with Server]", false);
+            shortcutPullTo = config("7 - Shortcuts", "Pull To Target mode", defaultValue: new KeyboardShortcut(KeyCode.LeftShift), "Hold why harpoon is flying to make you always pull to target [Not Synced with Server]", false);
+            shortcutRelease = config("7 - Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[1] { KeyCode.LeftControl }), "Release line [Not Synced with Server]", false);
+            shortcutStop = config("7 - Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[2] { KeyCode.LeftShift, KeyCode.LeftControl }), "Stop harpooning [Not Synced with Server]", false);
 
-            maxQuality = config("Stats - Item", "Max quality", defaultValue: 4, "Maximum quality level");
-            durabilityPerLevel = config("Stats - Item", "Durability per level", defaultValue: 100f, "Durability added per level");
-            disableDurability = config("Stats - Item", "Disable durability", defaultValue: false, "Make harpoon to not use durability");
-            disableDamage = config("Stats - Item", "Disable damage", defaultValue: false, "Make harpoon to deal no damage. Handy to ride a deathsquito without killing it. Or even birds.");
+            pullSpeed = config("8 - Debug", "Pull speed", defaultValue: 1000f, "[Math] Pull speed of static line. Used in velocity math. No actual need to mess with it.");
+            pullForceMultiplier = config("8 - Debug", "Pull force multiplier", defaultValue: 1f, "[Math] Pull force multiplier. Depends on moved body mass. No actual need to mess with it.");
+            smoothDistance = config("8 - Debug", "Smooth distance", defaultValue: 2f, "[Math] Makes the applied force smoother. No actual need to mess with it.");
+            forcePower = config("8 - Debug", "Force power", defaultValue: 1f, "[Math] Power (exponentiation part) of the actual force. No actual need to mess with it.");
+            useForce = config("8 - Debug", "Use force", defaultValue: true, "[Math] If true - pull physics use force applied to moved body. If false - uses velocity calculation. No actual need to mess with it.");
+            targetMessagesEnabled = config("8 - Debug", "Enabled harpooning target message for all objects", defaultValue: false, "Enable unlocalized target name for any object you hit. [Not Synced with Server]", false);
+            deepLoggingEnabled = config("8 - Debug", "Logging deep stats", defaultValue: false, "Enable deep logging to debug physics events. [Not Synced with Server]", false);
+            hitboxSize = config("8 - Debug", "Hitbox size", defaultValue: 0.0f, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
+            alwaysPullTo = config("8 - Debug", "Always pull to", defaultValue: false, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
 
-            shortcutPull = config("Shortcuts", "Pull", defaultValue: new KeyboardShortcut(KeyCode.T), "Pull target closer if applicable [Not Synced with Server]", false);
-            shortcutPullTo = config("Shortcuts", "Pull To Target mode", defaultValue: new KeyboardShortcut(KeyCode.LeftShift), "Hold why harpoon is flying to make you always pull to target [Not Synced with Server]", false);
-            shortcutRelease = config("Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[1] { KeyCode.LeftControl }), "Release line [Not Synced with Server]", false);
-            shortcutStop = config("Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[2] { KeyCode.LeftShift, KeyCode.LeftControl }), "Stop harpooning [Not Synced with Server]", false);
         }
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, ConfigDescription description, bool synchronizedSetting = true)
@@ -419,11 +424,10 @@ namespace HarpoonExtended
 
             statusEffect.m_breakDistance = breakDistance.Value;
             statusEffect.m_maxDistance  = maxDistance.Value;
-            statusEffect.m_staminaDrain = drainStamina.Value;
+            statusEffect.m_staminaDrain = 0.1f * drainStamina.Value;
             statusEffect.m_pullSpeed = pullSpeed.Value;
             statusEffect.m_smoothDistance = smoothDistance.Value;
             statusEffect.m_forcePower = forcePower.Value;
-            statusEffect.m_maxLineSlack = maxLineSlack.Value;
         }
 
         [HarmonyPatch(typeof(Projectile), nameof(Projectile.Awake))]
@@ -521,6 +525,10 @@ namespace HarpoonExtended
 
             item.m_shared.m_useDurability = !disableDurability.Value;
 
+            item.m_shared.m_useDurabilityDrain = durabilityDrain.Value;
+
+            item.m_shared.m_attack.m_attackStamina = disableStamina.Value ? 0f : attackStamina.Value;
+
             if (targetPulling.Value && targetCreatures.Value)
                 item.m_shared.m_attackStatusEffect = null;
         }
@@ -568,8 +576,8 @@ namespace HarpoonExtended
                 if (targetLeviathan.Value && (bool)colliderHitObject.GetComponent<Leviathan>() && colliderHitObject.GetComponent<Rigidbody>().isKinematic == true)
                     colliderHitObject.GetComponent<Rigidbody>().isKinematic = false;
 
-                if (deepLoggingEnabled.Value) LogInfo($"Hit Collider: {collider.name} | hit object: {colliderHitObject.name} | " +
-                    (colliderHitObject.TryGetComponent<ZNetView>(out ZNetView collider_nview) ? $"Owner:{collider_nview.IsOwner()}" : "") +
+                if (deepLoggingEnabled.Value) LogInfo($"Hit Collider: {collider.name} | hit object: {colliderHitObject.name}" +
+                    (colliderHitObject.TryGetComponent<ZNetView>(out ZNetView collider_nview) ? $" | Owner:{collider_nview.IsOwner()}" : "") +
                     ((bool)colliderHitObject.GetComponent<Destructible>() ? " : Destructible" : "") +
                     ((bool)colliderHitObject.GetComponent<Rigidbody>() ? " : Rigidbody" : "") +
                     ((bool)colliderHitObject.GetComponent<ResourceRoot>() ? " : ResourceRoot" : "") +
@@ -595,6 +603,13 @@ namespace HarpoonExtended
                     targetLeviathan.Value && (bool)colliderHitObject.GetComponent<Leviathan>() || 
                     targetItems.Value && (bool)colliderHitObject.GetComponent<ItemDrop>())
                 {
+                    float hitDistance = Vector3.Distance(hitPoint, Player.m_localPlayer.transform.position);
+                    if (hitDistance > m_maxDistance)
+                    {
+                        LogInfo("Too far");
+                        return;
+                    }
+
                     if (harpooned != null && m_time >= 0.5f)
                     {
                         DestroyHarpooned("Reinstantiate");
@@ -614,6 +629,7 @@ namespace HarpoonExtended
         {
             rbody = objectToPull.GetComponent<Rigidbody>();
             target = pullToObjectTransform.transform;
+            isPullingTo = true;
         }
 
         public static float CalculateHitObjectMass(GameObject hitObject)
@@ -635,22 +651,20 @@ namespace HarpoonExtended
         {
             m_attacker = attacker;
             m_time = 0f;
-            harpoonHitPoint = hitPoint;
             targetName = "";
             m_breakDistance = breakDistance.Value;
             m_maxDistance = maxDistance.Value;
-            m_staminaDrain = drainStamina.Value;
+            m_staminaDrain = 0.1f * drainStamina.Value;
             m_pullSpeed = pullSpeed.Value;
             m_smoothDistance = smoothDistance.Value;
-            m_maxLineSlack = maxLineSlack.Value;
-            targetPoint = Vector3.zero;
             m_ship = hitObject.GetComponent<Ship>();
             m_lineRenderer = null;
+            isPullingTo = false;
 
             float hitObjectMass = CalculateHitObjectMass(hitObject);
 
             m_nview = hitObject.GetComponent<ZNetView>();
-            Character m_character = hitObject.GetComponent<Character>();
+            m_character = hitObject.GetComponent<Character>();
 
             if ((bool)hitObject.GetComponent<RandomFlyingBird>())
             {
@@ -663,7 +677,6 @@ namespace HarpoonExtended
                 // If the target has no rigidbody we should pull to it - set stational target hit point
                 if (deepLoggingEnabled.Value) LogInfo("Pull to object");
                 SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
-                targetPoint = hitPoint;
             }
             else if (pullTo)
             {
@@ -718,21 +731,13 @@ namespace HarpoonExtended
                 m_pullSpeed = 100f;
 
             targetHarpooned = hitObject;
+            targetDistance = Vector3.Distance(hitPoint, attacker.transform.position); 
 
-            mass = IsPullingTo() ? rbody.mass : hitObjectMass;
+            mass = isPullingTo ? rbody.mass : hitObjectMass;
 
             targetName = GetHarpoonedTargetName(hitObject, collider);
 
-            LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {hitObjectMass}, pull to: {IsPullingTo()}");
-
-            targetDistance = Vector3.Distance(PullPosition(), rbody.transform.position);
-            if (targetDistance > m_maxDistance)
-            {
-                HarpoonMessage("$msg_harpoon_targettoofar");
-                m_broken = true;
-                LogInfo("Too far");
-                return;
-            }
+            LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {hitObjectMass}, pull to: {isPullingTo}");
 
             noUpForce = (bool)hitObject.GetComponent<Ship>();
 
@@ -740,11 +745,11 @@ namespace HarpoonExtended
                 m_minDistance = 20f;  // Just in case because colliding with Levi will launch you in the sky
             else if (m_ship != null)
                 m_minDistance = minDistanceShip.Value;
-            else if (hitObject.TryGetComponent<Character>(out _))
+            else if (m_character != null)
                 m_minDistance = minDistanceCreature.Value;
             else if (hitObject.TryGetComponent<ItemDrop>(out _))
                 m_minDistance = minDistanceItem.Value;
-            else if (IsPullingTo())
+            else if (isPullingTo)
                 m_minDistance = minDistancePullToTarget.Value;
             else
                 m_minDistance = minDistancePullToPlayer.Value;
@@ -757,7 +762,7 @@ namespace HarpoonExtended
                 m_line.m_maxDistance = m_maxDistance;
 
                 m_lineRenderer = harpooned.GetComponent<LineRenderer>();
-                m_lineRenderer.transform.position = harpoonHitPoint;
+                m_lineRenderer.transform.position = hitPoint;
             }
 
             if (applySlowFall.Value)
@@ -766,23 +771,23 @@ namespace HarpoonExtended
             HarpoonMessage("$msg_harpoon_harpooned");
         }
 
-        public static Vector3 PullPosition()
-        {
-            return IsPullingTo() ? targetPoint : target.position;
-        }
-
         public static bool IsPullingTo()
         {
-            return targetPoint != Vector3.zero;
+            return isPullingTo && m_nview.IsOwner() || alwaysPullTo.Value;
+        }
+
+        public static Vector3 TargetPosition()
+        {
+            return isPullingTo ? m_lineRenderer.transform.position : target.position;
         }
 
         public void FixedUpdate()
         {
-            if (harpooned != null) 
-                UpdateStatusEffect(Time.fixedDeltaTime);
+            if (harpooned != null)
+                UpdateHarpoonEffect(Time.fixedDeltaTime);
         }
 
-        public static void UpdateStatusEffect(float dt)
+        public static void UpdateHarpoonEffect(float dt)
         {
             m_time += dt;
             
@@ -792,7 +797,7 @@ namespace HarpoonExtended
                 return;
             }
 
-            float distance = Vector3.Distance(PullPosition(), rbody.transform.position);
+            float distance = Vector3.Distance(TargetPosition(), rbody.transform.position);
 
             if (distance < m_minDistance)
             {
@@ -803,13 +808,21 @@ namespace HarpoonExtended
 
             Vector3 forcePoint = m_lineRenderer.transform.position;
 
-            float pullForce = (IsPullingTo() ? 1f : (1f - (1f / Mathf.Sqrt(mass + 1))) * rbody.mass / mass) * pullForceMultiplier.Value;
+            float pullForce;
+            if (isPullingTo)
+                pullForce = 1f;
+            else if (mass > 999)
+                pullForce = 1f;
+            else if (mass <= 1f)
+                pullForce = 0.05f * pullForceMultiplier.Value;
+            else
+                pullForce = (1f - (1f / Mathf.Sqrt(mass))) * (rbody.mass / mass) * pullForceMultiplier.Value;
 
-            float num2 = Pull(rbody, PullPosition(), targetDistance, m_pullSpeed, pullForce, m_smoothDistance, IsPullingTo() ? Vector3.zero : forcePoint, noUpForce, useForce.Value, forcePower.Value);
+            float num2 = Pull(rbody, TargetPosition(), targetDistance, m_pullSpeed, pullForce, m_smoothDistance, isPullingTo ? Vector3.zero : forcePoint, m_character != null, noUpForce, useForce.Value, forcePower.Value);
             m_drainStaminaTimer += dt; float stamina = 0f;
             if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
             {
-                stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mathf.Sqrt(mass)); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
+                stamina = m_staminaDrain * num2 * (isPullingTo ? 10f : mass > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
                 m_attacker.UseStamina(stamina);
                 m_drainStaminaTimer = 0f;
             }
@@ -819,7 +832,12 @@ namespace HarpoonExtended
                 m_line.SetSlack((1f - Utils.LerpStep(targetDistance / 2f, targetDistance, distance)) * m_maxLineSlack);
             }
 
-            if (deepLoggingEnabled.Value) LogInfo($"dist: {distance} targetDist: {targetDistance} force: {pullForce} dt: {num2} stam: {stamina} break: {distance - targetDistance} < {m_breakDistance}");
+            if (deepLoggingEnabled.Value) LogInfo($"dist: {distance,-5:F3} " +
+                                                  $"targetDist: {targetDistance,-5:F3} " +
+                                                  $"force: {pullForce,-5:F3} " +
+                                                  $"dt: {num2,-5:F3} " +
+                                                  $"stam: {stamina,-5:F3} " +
+                                                  $"break: {distance - targetDistance,-5:F3} < {m_breakDistance}");
 
             if (distance - targetDistance > m_breakDistance)
             {
@@ -843,7 +861,7 @@ namespace HarpoonExtended
             {
                 if (targetPulling.Value && (KeyPressPullHarpoon() || KeyPressReleaseHarpoon()) && !KeyPressStopHarpoon())
                 {
-                    float factorMass = IsPullingTo() ? 4f : 2f;
+                    float factorMass = isPullingTo ? 4f : 2f;
 
                     if (KeyPressReleaseHarpoon())
                         targetDistance += factorMass * dt * 2f * pullSpeedMultiplier.Value;
@@ -855,7 +873,7 @@ namespace HarpoonExtended
             }
         }
 
-        public static float Pull(Rigidbody body, Vector3 target, float targetDistance, float speed, float force, float smoothDistance, Vector3 forcePoint, bool noUpForce = false, bool useForce = false, float power = 1f)
+        public static float Pull(Rigidbody body, Vector3 target, float targetDistance, float speed, float force, float smoothDistance, Vector3 forcePoint, bool checkFreezeRotation, bool noUpForce = false, bool useForce = false, float power = 1f)
         {
             Vector3 position = forcePoint != Vector3.zero ? Vector3.Lerp(body.position, forcePoint, 0.5f) : body.position;
 
@@ -875,8 +893,24 @@ namespace HarpoonExtended
             ForceMode mode = useForce ? ForceMode.Impulse : ForceMode.VelocityChange;
             Vector3 force2 = a * num * Mathf.Clamp01(force);
 
+            bool surpassFreezeRotation = checkFreezeRotation && rbody.freezeRotation;
+
             if (forcePoint != Vector3.zero)
-                body.AddForceAtPosition(force2, position, mode);
+            {
+                if (surpassFreezeRotation)
+                {
+                    RigidbodyConstraints constraints = rbody.constraints;
+                    rbody.freezeRotation = false;
+                    rbody.constraints = RigidbodyConstraints.FreezeRotationZ;
+
+                    body.AddForceAtPosition(force2, position, mode);
+
+                    rbody.constraints = constraints;
+                    rbody.freezeRotation = true;
+                }
+                else
+                    body.AddForceAtPosition(force2, position, mode);
+            }
             else
                 body.AddForce(force2, mode);
 
@@ -932,7 +966,7 @@ namespace HarpoonExtended
             if (m_broken)
                 return true;
 
-            if (!IsPullingTo() && (m_nview == null || !m_nview.IsValid()))
+            if (!isPullingTo && (m_nview == null || !m_nview.IsValid()))
                 return true;
 
             if (!m_attacker)
@@ -947,7 +981,7 @@ namespace HarpoonExtended
             if (m_attacker.IsDead() || m_attacker.IsTeleporting() || m_attacker.InCutscene() || m_attacker.IsEncumbered())
                 return true;
 
-            if (IsPullingTo() && m_attacker.IsAttached())
+            if (isPullingTo && m_attacker.IsAttached())
             {
                 m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
                 return true;
