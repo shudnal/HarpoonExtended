@@ -117,7 +117,8 @@ namespace HarpoonExtended
 
         public static GameObject harpooned;
 
-        public static Rigidbody rbody;
+        public static Rigidbody objectRbody;
+        public static Rigidbody attackerRbody;
 
         public static GameObject targetHarpooned;
 
@@ -125,15 +126,13 @@ namespace HarpoonExtended
 
         public static bool noUpForce;
 
-        public static Transform target;
-
         public static ZNetView m_nview;
 
         public static Ship m_ship;
 
         public static Character m_character;
 
-        public static float mass;
+        public static float objectMass;
 
         public static LineRenderer m_lineRenderer;
 
@@ -625,28 +624,6 @@ namespace HarpoonExtended
             }
         }
 
-        public static void SetHarpoonPullTo(Player objectToPull, GameObject pullToObjectTransform)
-        {
-            rbody = objectToPull.GetComponent<Rigidbody>();
-            target = pullToObjectTransform.transform;
-            isPullingTo = true;
-        }
-
-        public static float CalculateHitObjectMass(GameObject hitObject)
-        {
-            float objectMass = 0f;
-
-            hitObject.GetComponentsInChildren<Rigidbody>().Do(rb => objectMass += rb.mass);
-
-            if (!hitObject.GetComponent<Ship>() && !hitObject.GetComponent<Vagon>())
-                hitObject.GetComponentsInChildren<Container>().Do(cont => objectMass += cont.GetInventory().GetTotalWeight() * containerInventoryWeightMassFactor.Value);
-            
-            if (hitObject.TryGetComponent<ItemDrop>(out ItemDrop item))
-                objectMass += item.m_itemData.GetWeight() * containerInventoryWeightMassFactor.Value;
-
-            return objectMass;
-        }
-
         public static void SetHarpooned(Player attacker, GameObject hitObject, Vector3 hitPoint, bool pullTo, Collider collider)
         {
             m_attacker = attacker;
@@ -661,7 +638,10 @@ namespace HarpoonExtended
             m_lineRenderer = null;
             isPullingTo = false;
 
-            float hitObjectMass = CalculateHitObjectMass(hitObject);
+            objectRbody = hitObject.GetComponent<Rigidbody>();
+            attackerRbody = attacker.GetComponent<Rigidbody>();
+            
+            objectMass = CalculateHitObjectMass(hitObject);
 
             m_nview = hitObject.GetComponent<ZNetView>();
             m_character = hitObject.GetComponent<Character>();
@@ -670,61 +650,57 @@ namespace HarpoonExtended
             {
                 // Bird doesn't have rigidbody but is not stational
                 if (deepLoggingEnabled.Value) LogInfo("Pull to bird");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
-            else if (!hitObject.TryGetComponent<Rigidbody>(out Rigidbody objectRbody))
+            else if (!(bool)objectRbody)
             {
                 // If the target has no rigidbody we should pull to it - set stational target hit point
                 if (deepLoggingEnabled.Value) LogInfo("Pull to object");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
             else if (pullTo)
             {
                 // if the target has rigidbody yet we should pull to it - set target transform
                 if (deepLoggingEnabled.Value) LogInfo("Pull to target intentional");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
             else if (m_character != null && (m_character.IsAttached()))
             {
                 // You can't move attached Character
                 if (deepLoggingEnabled.Value) LogInfo("Can't pull attached");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
             else if (m_ship != null && m_ship.HaveControllingPlayer())
             {
                 // You can't move already moving ship
                 if (deepLoggingEnabled.Value) LogInfo("Can't pull owned moving ship");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
             else if (hitObject.TryGetComponent<Vagon>(out Vagon vagon) && vagon.InUse())
             {
                 // You can't move already moving vagon
                 if (deepLoggingEnabled.Value) LogInfo("Can't pull owned moving vagon");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
-            else if (m_ship == null && hitObjectMass > maxBodyMassToPull.Value)
+            else if (m_ship == null && objectMass > maxBodyMassToPull.Value)
             {
-                if (deepLoggingEnabled.Value) LogInfo($"Can't pull object {objectRbody} with mass {hitObjectMass} more that {maxBodyMassToPull.Value}");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                if (deepLoggingEnabled.Value) LogInfo($"Can't pull object {objectRbody} with mass {objectMass} more that {maxBodyMassToPull.Value}");
+                isPullingTo = true;
             }
             else if (!(bool)hitObject.GetComponent<ZSyncTransform>())
             {
                 if (deepLoggingEnabled.Value) LogInfo("Can't pull not netsynchronized object");
-                SetHarpoonPullTo(objectToPull: attacker, pullToObjectTransform: hitObject);
+                isPullingTo = true;
             }
             else if (m_nview.IsOwner())
             {
                 if (deepLoggingEnabled.Value) LogInfo("Move owned");
-                rbody = objectRbody;
-                target = attacker.transform;
             }
             else
             {
                 // screw it take ownership and move
                 if (deepLoggingEnabled.Value) LogInfo("Claim ownership and movе");
                 m_nview.ClaimOwnership();
-                rbody = objectRbody;
-                target = attacker.transform;
             }
 
             if ((bool)hitObject.GetComponent<ItemDrop>())
@@ -733,11 +709,9 @@ namespace HarpoonExtended
             targetHarpooned = hitObject;
             targetDistance = Vector3.Distance(hitPoint, attacker.transform.position); 
 
-            mass = isPullingTo ? rbody.mass : hitObjectMass;
-
             targetName = GetHarpoonedTargetName(hitObject, collider);
 
-            LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {hitObjectMass}, pull to: {isPullingTo}");
+            LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {objectMass}, pull to: {isPullingTo}");
 
             noUpForce = (bool)hitObject.GetComponent<Ship>();
 
@@ -776,9 +750,34 @@ namespace HarpoonExtended
             return isPullingTo && m_nview.IsOwner() || alwaysPullTo.Value;
         }
 
+        public static Rigidbody RBody()
+        {
+            return IsPullingTo() ? attackerRbody : objectRbody;
+        }
+
+        public static float Mass()
+        {
+            return IsPullingTo() ? attackerRbody.mass + m_attacker.GetInventory().GetTotalWeight() * containerInventoryWeightMassFactor.Value : objectMass;
+        }
+
         public static Vector3 TargetPosition()
         {
-            return isPullingTo ? m_lineRenderer.transform.position : target.position;
+            return IsPullingTo() ? m_lineRenderer.transform.position : m_attacker.transform.position;
+        }
+
+        public static float CalculateHitObjectMass(GameObject hitObject)
+        {
+            float objectMass = 0f;
+
+            hitObject.GetComponentsInChildren<Rigidbody>().Do(rb => objectMass += rb.mass);
+
+            if (!hitObject.GetComponent<Ship>() && !hitObject.GetComponent<Vagon>())
+                hitObject.GetComponentsInChildren<Container>().Do(cont => objectMass += cont.GetInventory().GetTotalWeight() * containerInventoryWeightMassFactor.Value);
+
+            if (hitObject.TryGetComponent<ItemDrop>(out ItemDrop item))
+                objectMass += item.m_itemData.GetWeight() * containerInventoryWeightMassFactor.Value;
+
+            return objectMass;
         }
 
         public void FixedUpdate()
@@ -797,7 +796,7 @@ namespace HarpoonExtended
                 return;
             }
 
-            float distance = Vector3.Distance(TargetPosition(), rbody.transform.position);
+            float distance = Vector3.Distance(TargetPosition(), RBody().transform.position);
 
             if (distance < m_minDistance)
             {
@@ -809,20 +808,20 @@ namespace HarpoonExtended
             Vector3 forcePoint = m_lineRenderer.transform.position;
 
             float pullForce;
-            if (isPullingTo)
+            if (IsPullingTo())
                 pullForce = 1f;
-            else if (mass > 999)
+            else if (Mass() > 999)
                 pullForce = 1f;
-            else if (mass <= 1f)
+            else if (Mass() <= 1f)
                 pullForce = 0.05f * pullForceMultiplier.Value;
             else
-                pullForce = (1f - (1f / Mathf.Sqrt(mass))) * (rbody.mass / mass) * pullForceMultiplier.Value;
+                pullForce = (1f - (1f / Mathf.Sqrt(Mass()))) * (RBody().mass / Mass()) * pullForceMultiplier.Value;
 
-            float num2 = Pull(rbody, TargetPosition(), targetDistance, m_pullSpeed, pullForce, m_smoothDistance, isPullingTo ? Vector3.zero : forcePoint, m_character != null, noUpForce, useForce.Value, forcePower.Value);
+            float num2 = Pull(RBody(), TargetPosition(), targetDistance, m_pullSpeed, pullForce, m_smoothDistance, IsPullingTo() ? Vector3.zero : forcePoint, m_character != null, noUpForce, useForce.Value, forcePower.Value);
             m_drainStaminaTimer += dt; float stamina = 0f;
             if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
             {
-                stamina = m_staminaDrain * num2 * (isPullingTo ? 10f : mass > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
+                stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
                 m_attacker.UseStamina(stamina);
                 m_drainStaminaTimer = 0f;
             }
@@ -861,7 +860,7 @@ namespace HarpoonExtended
             {
                 if (targetPulling.Value && (KeyPressPullHarpoon() || KeyPressReleaseHarpoon()) && !KeyPressStopHarpoon())
                 {
-                    float factorMass = isPullingTo ? 4f : 2f;
+                    float factorMass = IsPullingTo() ? 4f : 2f;
 
                     if (KeyPressReleaseHarpoon())
                         targetDistance += factorMass * dt * 2f * pullSpeedMultiplier.Value;
@@ -873,7 +872,7 @@ namespace HarpoonExtended
             }
         }
 
-        public static float Pull(Rigidbody body, Vector3 target, float targetDistance, float speed, float force, float smoothDistance, Vector3 forcePoint, bool checkFreezeRotation, bool noUpForce = false, bool useForce = false, float power = 1f)
+        public static float Pull(Rigidbody body, Vector3 target, float targetDistance, float speed, float force, float smoothDistance, Vector3 forcePoint, bool checkFreezeRotation = false, bool noUpForce = false, bool useForce = false, float power = 1f)
         {
             Vector3 position = forcePoint != Vector3.zero ? Vector3.Lerp(body.position, forcePoint, 0.5f) : body.position;
 
@@ -893,20 +892,20 @@ namespace HarpoonExtended
             ForceMode mode = useForce ? ForceMode.Impulse : ForceMode.VelocityChange;
             Vector3 force2 = a * num * Mathf.Clamp01(force);
 
-            bool surpassFreezeRotation = checkFreezeRotation && rbody.freezeRotation;
+            bool surpassFreezeRotation = checkFreezeRotation && body.freezeRotation;
 
             if (forcePoint != Vector3.zero)
             {
                 if (surpassFreezeRotation)
                 {
-                    RigidbodyConstraints constraints = rbody.constraints;
-                    rbody.freezeRotation = false;
-                    rbody.constraints = RigidbodyConstraints.FreezeRotationZ;
+                    RigidbodyConstraints constraints = body.constraints;
+                    body.freezeRotation = false;
+                    body.constraints = RigidbodyConstraints.FreezeRotationZ;
 
                     body.AddForceAtPosition(force2, position, mode);
 
-                    rbody.constraints = constraints;
-                    rbody.freezeRotation = true;
+                    body.constraints = constraints;
+                    body.freezeRotation = true;
                 }
                 else
                     body.AddForceAtPosition(force2, position, mode);
@@ -930,9 +929,10 @@ namespace HarpoonExtended
             m_lineRenderer = null;
             m_nview = null;
             m_time = 0f;
-            rbody = null;
+            attackerRbody = null;
+            objectRbody = null;
+
             targetHarpooned = null;
-            target = null;
             m_ship = null;
 
             if (harpooned != null)
@@ -966,7 +966,7 @@ namespace HarpoonExtended
             if (m_broken)
                 return true;
 
-            if (!isPullingTo && (m_nview == null || !m_nview.IsValid()))
+            if (!IsPullingTo() && (m_nview == null || !m_nview.IsValid()))
                 return true;
 
             if (!m_attacker)
@@ -981,7 +981,7 @@ namespace HarpoonExtended
             if (m_attacker.IsDead() || m_attacker.IsTeleporting() || m_attacker.InCutscene() || m_attacker.IsEncumbered())
                 return true;
 
-            if (isPullingTo && m_attacker.IsAttached())
+            if (IsPullingTo() && m_attacker.IsAttached())
             {
                 m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
                 return true;
