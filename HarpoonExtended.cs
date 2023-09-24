@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.0.1";
+        const string pluginVersion = "1.1.0";
 
         private Harmony _harmony;
 
