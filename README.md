@@ -76,6 +76,9 @@ To get proper tooltips on config options first open the game menu (Esc) and then
 
 ## Changelog
 
+v 1.1.1
+* killing harpooned fix
+
 v 1.1.0
 * Major physics and config overhaul
 

@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.0";
+        const string pluginVersion = "1.1.1";
 
         private Harmony _harmony;
 
@@ -463,6 +463,19 @@ namespace HarpoonExtended
                     ___m_damage.Modify(0f);
 
                 ___m_vel *= projectileVelocityMultiplier.Value;
+            }
+        }
+
+
+        [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Destroy))]
+        public static class ZNetScene_Destroy_CheckParentDestroy
+        {
+            private static void Prefix(ZNetScene __instance, GameObject go)
+            {
+                if (!modEnabled.Value) return;
+
+                if (harpooned != null && go.transform == harpooned.transform.parent)
+                    DestroyHarpooned("Parent destroyed");
             }
         }
 
