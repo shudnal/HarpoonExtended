@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.1";
+        const string pluginVersion = "1.1.2";
 
         private Harmony _harmony;
 
@@ -760,7 +760,7 @@ namespace HarpoonExtended
 
         public static bool IsPullingTo()
         {
-            return isPullingTo && m_nview.IsOwner() || alwaysPullTo.Value;
+            return isPullingTo || m_nview == null || !m_nview.IsOwner() || alwaysPullTo.Value;
         }
 
         public static Rigidbody RBody()
