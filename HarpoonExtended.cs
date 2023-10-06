@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.2";
+        const string pluginVersion = "1.1.3";
 
         private Harmony _harmony;
 
@@ -466,7 +466,6 @@ namespace HarpoonExtended
             }
         }
 
-
         [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Destroy))]
         public static class ZNetScene_Destroy_CheckParentDestroy
         {
@@ -563,16 +562,22 @@ namespace HarpoonExtended
         [HarmonyPatch(typeof(Projectile), nameof(Projectile.OnHit))]
         public static class Projectile_OnHit_HarpoonStats
         {
-            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint)
+            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint, ZNetView ___m_nview)
             {
                 if (!modEnabled.Value) return;
 
-                if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
+                //if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
+
+                if (!___m_nview.IsOwner()) return;
 
                 if (collider == null || ___m_owner != Player.m_localPlayer) return;
 
                 GameObject colliderHitObject = Projectile.FindHitObject(collider);
                 if (colliderHitObject == null) return;
+
+                if (deepLoggingEnabled.Value) LogInfo($"Hit Collider: {collider.name} | hit object: {colliderHitObject.name}");
+
+                if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
 
                 if (targetCreatures.Value && colliderHitObject.TryGetComponent<Character>(out Character targetCharacter) && (targetCharacter.IsPlayer()))
                 {
