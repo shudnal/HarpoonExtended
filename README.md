@@ -76,6 +76,9 @@ To get proper tooltips on config options first open the game menu (Esc) and then
 
 ## Changelog
 
+v 1.1.4
+* patch 0.217.24
+
 v 1.1.3
 * patch 0.217.22
 

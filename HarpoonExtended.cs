@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.3";
+        const string pluginVersion = "1.1.4";
 
         private Harmony _harmony;
 
@@ -84,6 +84,7 @@ namespace HarpoonExtended
         private static ConfigEntry<KeyboardShortcut> shortcutStop;
 
         internal static int s_rayMaskSolidsAndItem = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle", "item");
+        internal static int s_rayMaskSolids;
 
         internal static HarpoonExtended instance;
 
@@ -444,7 +445,11 @@ namespace HarpoonExtended
                 ___m_rayRadius = Mathf.Clamp(hitboxSize.Value, 0.0f, 0.5f);
 
                 if (targetItems.Value)
+                {
+                    s_rayMaskSolids = ___s_rayMaskSolids;
                     ___s_rayMaskSolids = s_rayMaskSolidsAndItem;
+                }
+                    
             }
         }
 
@@ -562,22 +567,23 @@ namespace HarpoonExtended
         [HarmonyPatch(typeof(Projectile), nameof(Projectile.OnHit))]
         public static class Projectile_OnHit_HarpoonStats
         {
-            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint, ZNetView ___m_nview)
+            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint, ZNetView ___m_nview, ref int ___s_rayMaskSolids)
             {
                 if (!modEnabled.Value) return;
 
-                //if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
+                if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
 
                 if (!___m_nview.IsOwner()) return;
+
+                if (targetItems.Value)
+                {
+                    ___s_rayMaskSolids = s_rayMaskSolids;
+                }
 
                 if (collider == null || ___m_owner != Player.m_localPlayer) return;
 
                 GameObject colliderHitObject = Projectile.FindHitObject(collider);
                 if (colliderHitObject == null) return;
-
-                if (deepLoggingEnabled.Value) LogInfo($"Hit Collider: {collider.name} | hit object: {colliderHitObject.name}");
-
-                if (!__instance.name.StartsWith("projectile_chitinharpoon")) return;
 
                 if (targetCreatures.Value && colliderHitObject.TryGetComponent<Character>(out Character targetCharacter) && (targetCharacter.IsPlayer()))
                 {
@@ -839,9 +845,12 @@ namespace HarpoonExtended
             m_drainStaminaTimer += dt; float stamina = 0f;
             if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
             {
-                stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
-                m_attacker.UseStamina(stamina);
                 m_drainStaminaTimer = 0f;
+                if (IsPullingTo() || !m_attacker.IsAttachedToShip())
+                {
+                    stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
+                    m_attacker.UseStamina(stamina);
+                }
             }
 
             if ((bool)m_line)
