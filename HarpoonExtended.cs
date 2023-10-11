@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.4";
+        const string pluginVersion = "1.1.5";
 
         private Harmony _harmony;
 
@@ -32,6 +32,7 @@ namespace HarpoonExtended
 
         private static ConfigEntry<float> timeBeforeStop;
         private static ConfigEntry<bool> applySlowFall;
+        private static ConfigEntry<bool> attachedShipStamina;
 
         private static ConfigEntry<bool> targetPulling;
         private static ConfigEntry<float> pullSpeedMultiplier;
@@ -191,6 +192,7 @@ namespace HarpoonExtended
             timeBeforeStop = config("6 - Misc", "Time before harpoon can be dropped", defaultValue: 1.0f, "Time in seconds the harpoon should exists before it can be released. To prevent spam mistakes. [Not Synced with Server]", false);
             applySlowFall = config("6 - Misc", "Apply Feather Fall while harpooning around", defaultValue: true, "Apply Feather Fall while using the harpoon to prevent fall damage");
             drainStamina = config("6 - Misc", "Stamina drain multiplier", defaultValue: 1.0f, "Stamina drain for target pulling.");
+            attachedShipStamina = config("6 - Misc", "No stamina usage while attached to ship", defaultValue: true, "Disable stamina usage while attached to ship");
 
             targetPulling = config("3 - Pull", "Enable pulling", defaultValue: true, "Enable active pulling harpooned target or yourself. Hold Use button to retrieve line or Crouch + Use buttons to cast line.");
             pullSpeedMultiplier = config("3 - Pull", "Harpoon line casting and retrieving speed multiplier", defaultValue: 1.0f, "Speed of line casting and retrieving");
@@ -212,9 +214,9 @@ namespace HarpoonExtended
             durabilityPerLevel = config("5 - Item", "Durability per level", defaultValue: 100f, "Durability added per level");
             durabilityDrain = config("5 - Item", "Durability drain on attack", defaultValue: 1f, "Durability drain on usage");
             attackStamina = config("5 - Item", "Stamina drain on attack", defaultValue: 15f, "Stamina drain on usage");
-            disableDurability = config("5 - Item", "Disable harpoon durability usage", defaultValue: false, "Make harpoon to not use durability");
-            disableDamage = config("5 - Item", "Disable harpoon damage", defaultValue: false, "Make harpoon to deal no damage. Handy to ride a deathsquito without killing it. Or even birds.");
-            disableStamina = config("5 - Item", "Disable harpoon stamina usage", defaultValue: false, "Make harpoon to not use stamina.");
+            disableDurability = config("5 - Item", "Disable harpoon durability usage", defaultValue: false, "Make harpoon to not use durability. Restart required after change.");
+            disableDamage = config("5 - Item", "Disable harpoon damage", defaultValue: false, "Make harpoon to deal no damage. Handy to ride a deathsquito without killing it. Or even birds. Restart required after change.");
+            disableStamina = config("5 - Item", "Disable harpoon stamina usage", defaultValue: false, "Make harpoon to not use stamina. Restart required after change.");
             projectileGravityMiltiplier = config("5 - Item", "Projectile gravity multiplier", defaultValue: 1.0f, "Multiplier of gravity affecting harpoon projectile");
             projectileVelocityMultiplier = config("5 - Item", "Projectile velocity multiplier", defaultValue: 1.0f, "Basically speed of initial harpoon flight");
 
@@ -410,7 +412,7 @@ namespace HarpoonExtended
                         PatchHarpoonItemData(___m_recipes[index].m_item.m_itemData);
 
                         foreach (Piece.Requirement resource in ___m_recipes[index].m_resources)
-                            resource.m_amountPerLevel = !(resource.m_resItem.m_itemData.m_shared.m_name == "$item_chitin") ? 0 : 20;
+                            resource.m_amountPerLevel = (resource.m_resItem.m_itemData.m_shared.m_name != "$item_chitin") ? 0 : 20;
 
                         break;
                     }
@@ -795,7 +797,7 @@ namespace HarpoonExtended
 
             hitObject.GetComponentsInChildren<Rigidbody>().Do(rb => objectMass += rb.mass);
 
-            if (!hitObject.GetComponent<Ship>() && !hitObject.GetComponent<Vagon>())
+            if (m_ship == null && !hitObject.GetComponent<Vagon>())
                 hitObject.GetComponentsInChildren<Container>().Do(cont => objectMass += cont.GetInventory().GetTotalWeight() * containerInventoryWeightMassFactor.Value);
 
             if (hitObject.TryGetComponent<ItemDrop>(out ItemDrop item))
@@ -841,12 +843,14 @@ namespace HarpoonExtended
             else
                 pullForce = (1f - (1f / Mathf.Sqrt(Mass()))) * (RBody().mass / Mass()) * pullForceMultiplier.Value;
 
-            float num2 = Pull(RBody(), TargetPosition(), targetDistance, m_pullSpeed, pullForce, m_smoothDistance, IsPullingTo() ? Vector3.zero : forcePoint, m_character != null, noUpForce, useForce.Value, forcePower.Value);
+            float pullSpeed = (m_attacker.IsAttachedToShip() && (bool)m_ship) ? 10000f : m_pullSpeed;
+
+            float num2 = Pull(RBody(), TargetPosition(), targetDistance, pullSpeed, pullForce, m_smoothDistance, IsPullingTo() ? Vector3.zero : forcePoint, m_character != null, noUpForce, useForce.Value, forcePower.Value);
             m_drainStaminaTimer += dt; float stamina = 0f;
             if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
             {
                 m_drainStaminaTimer = 0f;
-                if (IsPullingTo() || !m_attacker.IsAttachedToShip())
+                if (!attachedShipStamina.Value || IsPullingTo() || !m_attacker.IsAttachedToShip())
                 {
                     stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
                     m_attacker.UseStamina(stamina);
@@ -1015,6 +1019,12 @@ namespace HarpoonExtended
             }
 
             if (!targetBosses.Value && targetHarpooned.TryGetComponent<Humanoid>(out Humanoid human) && human.IsBoss())
+            {
+                m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
+                return true;
+            }
+
+            if (Ship.GetLocalShip() != null && Ship.GetLocalShip() == m_ship)
             {
                 m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
                 return true;

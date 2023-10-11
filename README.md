@@ -76,6 +76,11 @@ To get proper tooltips on config options first open the game menu (Esc) and then
 
 ## Changelog
 
+v 1.1.5
+* fixed Munchausen pulling-your-ship bug
+* added option to not use stamina while attached to a ship
+* easier pulling another ship while attached to a ship (it becomes possible to drag another ship)
+
 v 1.1.4
 * patch 0.217.24
 
