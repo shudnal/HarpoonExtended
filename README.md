@@ -76,6 +76,9 @@ To get proper tooltips on config options first open the game menu (Esc) and then
 
 ## Changelog
 
+v 1.1.6
+* slow fall fix
+
 v 1.1.5
 * fixed Munchausen pulling-your-ship bug
 * added option to not use stamina while attached to a ship

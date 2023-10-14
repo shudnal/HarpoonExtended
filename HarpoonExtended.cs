@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.5";
+        const string pluginVersion = "1.1.6";
 
         private Harmony _harmony;
 
@@ -141,7 +141,7 @@ namespace HarpoonExtended
         public static bool isPullingTo;
 
         public static bool castSlowFall = false;
-        public static bool playerDropped = false;
+        public static bool slowFallCasted = false;
         public static float onGroundTimer = 0f;
 
         public static SE_Harpooned harpoonedStatusEffect;
@@ -352,22 +352,51 @@ namespace HarpoonExtended
                 {
                     if (!___m_seman.HaveStatusEffect("SlowFall"))
                     {
+                        slowFallCasted = true;
                         ___m_seman.AddStatusEffect("SlowFall".GetStableHashCode());
                         LogInfo("Cast slow fall");
                     }
-                    castSlowFall = false; 
+
+                    castSlowFall = false;
                     onGroundTimer = 0f;
                 }
 
-                if (harpooned == null && playerDropped && __instance.IsOnGround())
+                if (slowFallCasted && harpooned == null)
                 {
-                    onGroundTimer += Time.deltaTime;
-                    if (onGroundTimer >= 2f)
+                    if (slowFallCasted && __instance.IsAttached())
                     {
-                        playerDropped = false;
+                        slowFallCasted = false;
                         if (___m_seman.HaveStatusEffect("SlowFall"))
                             ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
-                        LogInfo("Remove slow fall");
+                        LogInfo("Remove slow fall on attached");
+                    }
+
+                    if (slowFallCasted && __instance.IsSwimming())
+                    {
+                        slowFallCasted = false;
+                        if (___m_seman.HaveStatusEffect("SlowFall"))
+                            ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
+                        LogInfo("Remove slow fall on swimming");
+                    }
+
+                    if (slowFallCasted && __instance.IsDebugFlying())
+                    {
+                        slowFallCasted = false;
+                        if (___m_seman.HaveStatusEffect("SlowFall"))
+                            ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
+                        LogInfo("Remove slow fall on flying");
+                    }
+
+                    if (slowFallCasted && __instance.IsOnGround())
+                    {
+                        onGroundTimer += Time.deltaTime;
+                        if (onGroundTimer >= 2f)
+                        {
+                            slowFallCasted = false;
+                            if (___m_seman.HaveStatusEffect("SlowFall"))
+                                ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
+                            LogInfo("Remove slow fall on ground");
+                        }
                     }
                 }
             }
@@ -766,7 +795,10 @@ namespace HarpoonExtended
             }
 
             if (applySlowFall.Value)
+            {
                 castSlowFall = true;
+                slowFallCasted = false;
+            }
 
             HarpoonMessage("$msg_harpoon_harpooned");
         }
@@ -970,8 +1002,6 @@ namespace HarpoonExtended
                 ZNetScene.instance.Destroy(harpooned);
 
             harpooned = null;
-
-            playerDropped = true;
         }
 
         public static void HarpoonMessage(string message)
