@@ -1,0 +1,7 @@
+{
+  "name": "HarpoonExtended",
+  "version_number": "1.1.8",
+  "website_url": "https://github.com/shudnal/HarpoonExtended",
+  "description": "Harpoon everything! Pull and release the line. Pull yourself to target. Full control.",
+  "dependencies": ["denikson-BepInExPack_Valheim-5.4.2202"]
+}

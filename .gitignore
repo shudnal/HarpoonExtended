@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 /thunderstore/HarpoonExtended.dll
 /thunderstore/HarpoonExtended.zip
+/thunderstore
+/package/thunderstore/HarpoonExtended/HarpoonExtended.dll
+/package/thunderstore/HarpoonExtended.zip

@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.6";
+        const string pluginVersion = "1.1.8";
 
         private Harmony _harmony;
 
@@ -33,6 +33,9 @@ namespace HarpoonExtended
         private static ConfigEntry<float> timeBeforeStop;
         private static ConfigEntry<bool> applySlowFall;
         private static ConfigEntry<bool> attachedShipStamina;
+        private static ConfigEntry<bool> pullUnderWater;
+        private static ConfigEntry<bool> removeSlowFallWithoutHarpoon;
+        private static ConfigEntry<float> removeSlowFallonGroundThreshold;
 
         private static ConfigEntry<bool> targetPulling;
         private static ConfigEntry<float> pullSpeedMultiplier;
@@ -86,6 +89,11 @@ namespace HarpoonExtended
 
         internal static int s_rayMaskSolidsAndItem = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle", "item");
         internal static int s_rayMaskSolids;
+
+        internal static int m_slowFallHash = "SlowFall".GetStableHashCode();
+        internal const string prefabNameSpearChitin = "SpearChitin";
+        internal const string itemDropNameSpearChitin = "$item_spear_chitin";
+        internal const string statusEffectNameHarpooned = "Harpooned";
 
         internal static HarpoonExtended instance;
 
@@ -193,6 +201,9 @@ namespace HarpoonExtended
             applySlowFall = config("6 - Misc", "Apply Feather Fall while harpooning around", defaultValue: true, "Apply Feather Fall while using the harpoon to prevent fall damage");
             drainStamina = config("6 - Misc", "Stamina drain multiplier", defaultValue: 1.0f, "Stamina drain for target pulling.");
             attachedShipStamina = config("6 - Misc", "No stamina usage while attached to ship", defaultValue: true, "Disable stamina usage while attached to ship");
+            pullUnderWater = config("6 - Misc", "Pull to underwater", defaultValue: true, "Pull to underwater terrain.");
+            removeSlowFallWithoutHarpoon = config("6 - Misc", "Remove Feather Fall without harpoon", defaultValue: false, "Remove Feather Fall if harpoon is not equipped.");
+            removeSlowFallonGroundThreshold = config("6 - Misc", "Remove Feather Fall after seconds on ground", defaultValue: 2f, "Remove Feather Fall if a player stays without harpoon line on the ground for set amount of seconds."); 
 
             targetPulling = config("3 - Pull", "Enable pulling", defaultValue: true, "Enable active pulling harpooned target or yourself. Hold Use button to retrieve line or Crouch + Use buttons to cast line.");
             pullSpeedMultiplier = config("3 - Pull", "Harpoon line casting and retrieving speed multiplier", defaultValue: 1.0f, "Speed of line casting and retrieving");
@@ -283,11 +294,11 @@ namespace HarpoonExtended
 
                 if (___m_character.IsPlayer()) return;
 
-                if (!___m_character.IsOwner())
-                    ___m_character.m_nview.ClaimOwnership();
-
                 if ((KeyPressPullHarpoon() || KeyPressReleaseHarpoon()) && !KeyPressStopHarpoon())
                 {
+                    if (!___m_character.IsOwner())
+                        ___m_character.m_nview.ClaimOwnership();
+
                     if (KeyPressReleaseHarpoon())
                         ___m_baseDistance += 4f * dt * pullSpeedMultiplier.Value;
                     else if (KeyPressPullHarpoon())
@@ -337,10 +348,60 @@ namespace HarpoonExtended
             }
         }
 
-        [HarmonyPatch(typeof(Player), nameof(Player.Update))]
-        public static class Player_Update_Taxi
+        [HarmonyPatch(typeof(Player), nameof(Player.FixedUpdate))]
+        public static class Player_FixedUpdate_SlowFallControl
         {
-            private static void Postfix(Player __instance, ref SEMan ___m_seman)
+            private static void RemoveSlowFall(SEMan seman, string log)
+            {
+                slowFallCasted = false;
+                
+                if (seman.HaveStatusEffect(m_slowFallHash))
+                    seman.RemoveStatusEffect(m_slowFallHash, quiet: true);
+                
+                LogInfo(log);
+            }
+
+            private static void CheckSlowFallStatus(Player player)
+            {
+                if (harpooned != null)
+                    return;
+
+                SEMan seman = player.GetSEMan();
+
+                if (removeSlowFallonGroundThreshold.Value > 0f && onGroundTimer >= removeSlowFallonGroundThreshold.Value)
+                {
+                    RemoveSlowFall(seman, "Remove slow fall on ground");
+                    return;
+                }
+
+                if (player.IsAttached())
+                {
+                    RemoveSlowFall(seman, "Remove slow fall on attached");
+                    return;
+                }
+
+                if (player.IsSwimming())
+                {
+                    RemoveSlowFall(seman, "Remove slow fall on swimming");
+                    return;
+                }
+
+                if (player.IsDebugFlying())
+                {
+                    RemoveSlowFall(seman, "Remove slow fall on flying");
+                    return;
+                }
+
+                if (removeSlowFallWithoutHarpoon.Value 
+                    && (player.GetLeftItem() == null || player.GetLeftItem().m_shared.m_name != itemDropNameSpearChitin) 
+                    && (player.GetRightItem() == null || player.GetRightItem().m_shared.m_name != itemDropNameSpearChitin))
+                {
+                    RemoveSlowFall(seman, "Remove slow fall without harpoon");
+                    return;
+                }
+            }
+
+            private static void Postfix(Player __instance, SEMan ___m_seman)
             {
                 if (!modEnabled.Value)
                     return;
@@ -350,10 +411,10 @@ namespace HarpoonExtended
 
                 if (castSlowFall)
                 {
-                    if (!___m_seman.HaveStatusEffect("SlowFall"))
+                    if (!___m_seman.HaveStatusEffect(m_slowFallHash))
                     {
                         slowFallCasted = true;
-                        ___m_seman.AddStatusEffect("SlowFall".GetStableHashCode());
+                        ___m_seman.AddStatusEffect(m_slowFallHash);
                         LogInfo("Cast slow fall");
                     }
 
@@ -361,43 +422,12 @@ namespace HarpoonExtended
                     onGroundTimer = 0f;
                 }
 
-                if (slowFallCasted && harpooned == null)
+                if (slowFallCasted)
                 {
-                    if (slowFallCasted && __instance.IsAttached())
-                    {
-                        slowFallCasted = false;
-                        if (___m_seman.HaveStatusEffect("SlowFall"))
-                            ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
-                        LogInfo("Remove slow fall on attached");
-                    }
-
-                    if (slowFallCasted && __instance.IsSwimming())
-                    {
-                        slowFallCasted = false;
-                        if (___m_seman.HaveStatusEffect("SlowFall"))
-                            ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
-                        LogInfo("Remove slow fall on swimming");
-                    }
-
-                    if (slowFallCasted && __instance.IsDebugFlying())
-                    {
-                        slowFallCasted = false;
-                        if (___m_seman.HaveStatusEffect("SlowFall"))
-                            ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
-                        LogInfo("Remove slow fall on flying");
-                    }
-
-                    if (slowFallCasted && __instance.IsOnGround())
-                    {
+                    if (__instance.IsOnGround())
                         onGroundTimer += Time.deltaTime;
-                        if (onGroundTimer >= 2f)
-                        {
-                            slowFallCasted = false;
-                            if (___m_seman.HaveStatusEffect("SlowFall"))
-                                ___m_seman.RemoveStatusEffect("SlowFall".GetStableHashCode(), true);
-                            LogInfo("Remove slow fall on ground");
-                        }
-                    }
+
+                    CheckSlowFallStatus(__instance);
                 }
             }
         }
@@ -417,13 +447,23 @@ namespace HarpoonExtended
         [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
         public static class ObjectDB_Awake_HarpoonStat
         {
-            private static void Postfix(ObjectDB __instance, ref List<StatusEffect>  ___m_StatusEffects, ref List<Recipe> ___m_recipes)
+            public static void PatchHarpoonStatusEffectAndRecipe(ObjectDB __instance)
             {
                 if (!modEnabled.Value) return;
 
-                foreach (StatusEffect statusEffect in ___m_StatusEffects)
+                GameObject prefab = __instance.GetItemPrefab(prefabNameSpearChitin);
+                if (prefab == null)
+                    return;
+
+                ItemDrop item = prefab.GetComponent<ItemDrop>();
+                if (item == null)
+                    return;
+
+                PatchHarpoonItemData(item.m_itemData);
+
+                foreach (StatusEffect statusEffect in __instance.m_StatusEffects)
                 {
-                    if (statusEffect.name == "Harpooned" && statusEffect is SE_Harpooned)
+                    if (statusEffect.name == statusEffectNameHarpooned && statusEffect is SE_Harpooned)
                     {
                         harpoonedStatusEffect = statusEffect as SE_Harpooned;
                         PatchHarpoonStatusEffect(harpoonedStatusEffect);
@@ -431,21 +471,24 @@ namespace HarpoonExtended
                     }
                 }
 
-                for (int index = 0; index < ___m_recipes.Count - 1; index++)
-                {
-                    if (___m_recipes[index].m_item == null)
-                        continue;
+                Recipe recipe = __instance.GetRecipe(item.m_itemData);
+                if (recipe != null)
+                    foreach (Piece.Requirement resource in recipe.m_resources)
+                        resource.m_amountPerLevel = (resource.m_resItem.m_itemData.m_shared.m_name != "$item_chitin") ? 0 : 20;
+            }
 
-                    if (ObjectDB.instance.m_recipes[index].m_item.m_itemData.m_shared.m_name == "$item_spear_chitin")
-                    {
-                        PatchHarpoonItemData(___m_recipes[index].m_item.m_itemData);
+            private static void Postfix(ObjectDB __instance)
+            {
+                PatchHarpoonStatusEffectAndRecipe(__instance);
+            }
+        }
 
-                        foreach (Piece.Requirement resource in ___m_recipes[index].m_resources)
-                            resource.m_amountPerLevel = (resource.m_resItem.m_itemData.m_shared.m_name != "$item_chitin") ? 0 : 20;
-
-                        break;
-                    }
-                }
+        [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.CopyOtherDB))]
+        public static class ObjectDB_CopyOtherDB_HarpoonStat
+        {
+            private static void Postfix(ObjectDB __instance)
+            {
+                ObjectDB_Awake_HarpoonStat.PatchHarpoonStatusEffectAndRecipe(__instance);
             }
         }
 
@@ -477,7 +520,9 @@ namespace HarpoonExtended
 
                 if (targetItems.Value)
                 {
-                    s_rayMaskSolids = ___s_rayMaskSolids;
+                    if (s_rayMaskSolids == 0)
+                        s_rayMaskSolids =___s_rayMaskSolids;
+
                     ___s_rayMaskSolids = s_rayMaskSolidsAndItem;
                 }
                     
@@ -514,28 +559,34 @@ namespace HarpoonExtended
             }
         }
 
-        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Awake))]
-        public static class ItemDrop_Awake_HarpoonStats
+        [HarmonyPatch(typeof(Inventory), nameof(Inventory.Load))]
+        public class Inventory_Load_CircletStats
         {
-            private static void Postfix(ref ItemDrop __instance)
+            public static void Postfix(Inventory __instance)
             {
-                if (!modEnabled.Value) return;
+                if (!modEnabled.Value)
+                    return;
 
-                if (__instance.m_itemData.m_shared.m_name != "$item_spear_chitin") return;
+                List<ItemDrop.ItemData> items = new List<ItemDrop.ItemData>();
+                __instance.GetAllItems(itemDropNameSpearChitin, items);
 
-                PatchHarpoonItemData(__instance.m_itemData);
-                PatchHarpoonStatusEffect(__instance.m_itemData.m_shared.m_attackStatusEffect as SE_Harpooned);
+                foreach (ItemDrop.ItemData item in items)
+                {
+                    PatchHarpoonItemData(item);
+                    PatchHarpoonStatusEffect(item.m_shared.m_attackStatusEffect as SE_Harpooned);
+                }
             }
         }
-        
-        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.SlowUpdate))]
-        private static class ItemDrop_SlowUpdate_HarpoonStats
+
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Start))]
+        public static class ItemDrop_Start_HarpoonStats
         {
             private static void Postfix(ref ItemDrop __instance)
             {
                 if (!modEnabled.Value) return;
 
-                if (__instance.m_itemData.m_shared.m_name != "$item_spear_chitin") return;
+                if (__instance.GetPrefabName(__instance.name) != prefabNameSpearChitin)
+                    return;
 
                 PatchHarpoonItemData(__instance.m_itemData);
                 PatchHarpoonStatusEffect(__instance.m_itemData.m_shared.m_attackStatusEffect as SE_Harpooned);
@@ -550,12 +601,10 @@ namespace HarpoonExtended
                 if (!modEnabled.Value) return;
 
                 List<ItemDrop.ItemData> items = new List<ItemDrop.ItemData>();
-                __instance.GetInventory().GetAllItems("$item_spear_chitin", items);
-                
+                __instance.GetInventory().GetAllItems(itemDropNameSpearChitin, items);
+
                 foreach (ItemDrop.ItemData item in items)
                 {
-                    if (item.m_shared.m_name != "$item_spear_chitin") return;
-
                     PatchHarpoonItemData(item);
                     PatchHarpoonStatusEffect(item.m_shared.m_attackStatusEffect as SE_Harpooned);
                 }
@@ -564,8 +613,6 @@ namespace HarpoonExtended
 
         private static void PatchHarpoonItemData(ItemDrop.ItemData item)
         {
-            if (item.m_shared.m_name != "$item_spear_chitin") return;
-
             item.m_shared.m_maxQuality = Math.Max(Math.Min(maxQuality.Value, 4), 1);
 
             item.m_shared.m_durabilityPerLevel = Mathf.Clamp(durabilityPerLevel.Value, 50, 500);
@@ -575,9 +622,6 @@ namespace HarpoonExtended
             item.m_shared.m_useDurabilityDrain = durabilityDrain.Value;
 
             item.m_shared.m_attack.m_attackStamina = disableStamina.Value ? 0f : attackStamina.Value;
-
-            if (targetPulling.Value && targetCreatures.Value)
-                item.m_shared.m_attackStatusEffect = null;
         }
 
         [HarmonyPatch(typeof(Ship), nameof(Ship.UpdateOwner))]
@@ -598,7 +642,7 @@ namespace HarpoonExtended
         [HarmonyPatch(typeof(Projectile), nameof(Projectile.OnHit))]
         public static class Projectile_OnHit_HarpoonStats
         {
-            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint, ZNetView ___m_nview, ref int ___s_rayMaskSolids)
+            private static void Prefix(Projectile __instance, Collider collider, Character ___m_owner, Vector3 hitPoint, ZNetView ___m_nview, ref int ___s_rayMaskSolids, ref int ___m_statusEffectHash)
             {
                 if (!modEnabled.Value) return;
 
@@ -616,23 +660,31 @@ namespace HarpoonExtended
                 GameObject colliderHitObject = Projectile.FindHitObject(collider);
                 if (colliderHitObject == null) return;
 
-                if (targetCreatures.Value && colliderHitObject.TryGetComponent<Character>(out Character targetCharacter) && (targetCharacter.IsPlayer()))
+                if (targetCreatures.Value && colliderHitObject.TryGetComponent(out Character targetCharacter))
                 {
-                    if (targetCharacter.GetSEMan().HaveStatusEffect(harpoonedStatusEffect.NameHash()))
+                    if (!targetPulling.Value)
+                    {
+                        LogInfo($"Vanilla {harpoonedStatusEffect.m_name} status effect on {targetCharacter.m_name}");
                         return;
-                    
-                    StatusEffect statusEffect = targetCharacter.GetSEMan().AddStatusEffect(harpoonedStatusEffect);
-                    statusEffect.SetAttacker(___m_owner);
-                    LogInfo($"Vanilla {harpoonedStatusEffect.m_name} status effect on {targetCharacter.m_name}");
-                    return;
+                    }
+
+                    if (targetCharacter.IsPlayer())
+                    {
+                        LogInfo($"Vanilla {harpoonedStatusEffect.m_name} status effect on player {targetCharacter.m_name}");
+                        return; 
+                    }
+
+                    ___m_statusEffectHash = 0;
                 }
 
                 if (targetLeviathan.Value && (bool)colliderHitObject.GetComponent<Leviathan>() && colliderHitObject.GetComponent<Rigidbody>().isKinematic == true)
                     colliderHitObject.GetComponent<Rigidbody>().isKinematic = false;
 
                 if (deepLoggingEnabled.Value) LogInfo($"Hit Collider: {collider.name} | hit object: {colliderHitObject.name}" +
-                    (colliderHitObject.TryGetComponent<ZNetView>(out ZNetView collider_nview) ? $" | Owner:{collider_nview.IsOwner()}" : "") +
+                    (colliderHitObject.TryGetComponent(out ZNetView collider_nview) ? $" | Owner:{collider_nview.IsOwner()}" : "") +
                     ((bool)colliderHitObject.GetComponent<Destructible>() ? " : Destructible" : "") +
+                    ((bool)colliderHitObject.GetComponent<MineRock>() ? " : MineRock" : "") +
+                    ((bool)colliderHitObject.GetComponent<MineRock5>() ? " : MineRock5" : "") +
                     ((bool)colliderHitObject.GetComponent<Rigidbody>() ? " : Rigidbody" : "") +
                     ((bool)colliderHitObject.GetComponent<ResourceRoot>() ? " : ResourceRoot" : "") +
                     ((bool)colliderHitObject.GetComponent<ItemDrop>() ? " : ItemDrop" : "") +
@@ -652,7 +704,7 @@ namespace HarpoonExtended
                     targetTreeLog.Value && (bool)colliderHitObject.GetComponent<TreeLog>() ||
                     targetTreeBase.Value && (bool)colliderHitObject.GetComponent<TreeBase>() ||
                     targetPiece.Value && (bool)colliderHitObject.GetComponent<Piece>() ||
-                    targetDestructibles.Value && (bool)colliderHitObject.GetComponent<Destructible>() ||
+                    targetDestructibles.Value && ((bool)colliderHitObject.GetComponent<Destructible>() || (bool)colliderHitObject.GetComponent<MineRock>() || (bool)colliderHitObject.GetComponent<MineRock5>()) ||
                     targetFish.Value && (bool)colliderHitObject.GetComponent<Fish>() ||
                     targetLeviathan.Value && (bool)colliderHitObject.GetComponent<Leviathan>() || 
                     targetItems.Value && (bool)colliderHitObject.GetComponent<ItemDrop>())
@@ -728,13 +780,13 @@ namespace HarpoonExtended
             else if (m_ship != null && m_ship.HaveControllingPlayer())
             {
                 // You can't move already moving ship
-                if (deepLoggingEnabled.Value) LogInfo("Can't pull owned moving ship");
+                if (deepLoggingEnabled.Value) LogInfo("Can't pull already moving ship");
                 isPullingTo = true;
             }
             else if (hitObject.TryGetComponent<Vagon>(out Vagon vagon) && vagon.InUse())
             {
                 // You can't move already moving vagon
-                if (deepLoggingEnabled.Value) LogInfo("Can't pull owned moving vagon");
+                if (deepLoggingEnabled.Value) LogInfo("Can't pull already moving vagon");
                 isPullingTo = true;
             }
             else if (m_ship == null && objectMass > maxBodyMassToPull.Value)
@@ -797,7 +849,7 @@ namespace HarpoonExtended
             if (applySlowFall.Value)
             {
                 castSlowFall = true;
-                slowFallCasted = false;
+                //slowFallCasted = false;
             }
 
             HarpoonMessage("$msg_harpoon_harpooned");
@@ -1055,6 +1107,12 @@ namespace HarpoonExtended
             }
 
             if (Ship.GetLocalShip() != null && Ship.GetLocalShip() == m_ship)
+            {
+                m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
+                return true;
+            }
+
+            if (IsPullingTo() && !pullUnderWater.Value && TargetPosition().y < ZoneSystem.instance.m_waterLevel)
             {
                 m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
                 return true;

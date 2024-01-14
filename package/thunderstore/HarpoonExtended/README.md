@@ -74,6 +74,14 @@ To get proper tooltips on config options first open the game menu (Esc) and then
 
 ## Changelog
 
+v 1.1.8
+* more stable slowfall removal
+* damaged destructibles hit registration fixed
+* potential fix for players harpooning (vanilla behavior)
+
+v 1.1.7
+* option to disable pulling to underwater
+
 v 1.1.6
 * slow fall fix
 
