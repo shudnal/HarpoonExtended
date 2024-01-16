@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.8";
+        const string pluginVersion = "1.1.9";
 
         private Harmony _harmony;
 
@@ -69,6 +69,7 @@ namespace HarpoonExtended
         private static ConfigEntry<float> forcePower;
         private static ConfigEntry<bool> useForce;
         private static ConfigEntry<bool> alwaysPullTo;
+        private static ConfigEntry<float> maximumVelocity;
 
         private static ConfigEntry<float> projectileGravityMiltiplier;
         private static ConfigEntry<float> hitboxSize;
@@ -244,8 +245,8 @@ namespace HarpoonExtended
             targetMessagesEnabled = config("8 - Debug", "Enabled harpooning target message for all objects", defaultValue: false, "Enable unlocalized target name for any object you hit. [Not Synced with Server]", false);
             deepLoggingEnabled = config("8 - Debug", "Logging deep stats", defaultValue: false, "Enable deep logging to debug physics events. [Not Synced with Server]", false);
             hitboxSize = config("8 - Debug", "Hitbox size", defaultValue: 0.0f, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
-            alwaysPullTo = config("8 - Debug", "Always pull to", defaultValue: false, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
-
+            alwaysPullTo = config("8 - Debug", "Always pull to", defaultValue: false, "Always pull to target regardress hotkey");
+            maximumVelocity = config("8 - Debug", "Maximum velocity", defaultValue: 10f, "Maximum velocity imparted to player rigidbody by harpoon pulling");
         }
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, ConfigDescription description, bool synchronizedSetting = true)
@@ -660,6 +661,9 @@ namespace HarpoonExtended
                 GameObject colliderHitObject = Projectile.FindHitObject(collider);
                 if (colliderHitObject == null) return;
 
+                if (colliderHitObject.GetComponentInParent<FollowPlayer>() != null)
+                    return;
+
                 if (targetCreatures.Value && colliderHitObject.TryGetComponent(out Character targetCharacter))
                 {
                     if (!targetPulling.Value)
@@ -841,16 +845,15 @@ namespace HarpoonExtended
                 component.SetPeer(m_attacker.GetComponent<ZNetView>());
                 m_line = component;
                 m_line.m_maxDistance = m_maxDistance;
+                m_line.m_dynamicThickness = true;
+                m_line.m_minThickness = 0.04f;
 
                 m_lineRenderer = harpooned.GetComponent<LineRenderer>();
                 m_lineRenderer.transform.position = hitPoint;
             }
 
             if (applySlowFall.Value)
-            {
                 castSlowFall = true;
-                //slowFallCasted = false;
-            }
 
             HarpoonMessage("$msg_harpoon_harpooned");
         }
@@ -884,7 +887,7 @@ namespace HarpoonExtended
             if (m_ship == null && !hitObject.GetComponent<Vagon>())
                 hitObject.GetComponentsInChildren<Container>().Do(cont => objectMass += cont.GetInventory().GetTotalWeight() * containerInventoryWeightMassFactor.Value);
 
-            if (hitObject.TryGetComponent<ItemDrop>(out ItemDrop item))
+            if (hitObject.TryGetComponent(out ItemDrop item))
                 objectMass += item.m_itemData.GetWeight() * containerInventoryWeightMassFactor.Value;
 
             return objectMass;
@@ -1028,6 +1031,8 @@ namespace HarpoonExtended
             else
                 body.AddForce(force2, mode);
 
+            body.velocity = Vector3.ClampMagnitude(body.velocity, maximumVelocity.Value);
+
             return num;
         }
 
@@ -1123,16 +1128,16 @@ namespace HarpoonExtended
 
         private static string GetHarpoonedTargetName(GameObject hitObject, Collider collider)
         {
-            if (hitObject.TryGetComponent<HoverText>(out HoverText text))
+            if (hitObject.TryGetComponent(out HoverText text))
                 return text.m_text;
 
-            if (hitObject.TryGetComponent<ItemDrop>(out ItemDrop item))
+            if (hitObject.TryGetComponent(out ItemDrop item))
                 return item.m_itemData.m_shared.m_name;
 
             if (hitObject.TryGetComponent<Location>(out _))
                 return "$piece_lorestone";
 
-            if (hitObject.TryGetComponent<ResourceRoot>(out ResourceRoot root))
+            if (hitObject.TryGetComponent(out ResourceRoot root))
                 return root.m_name;
 
             if (hitObject.TryGetComponent<Ship>(out _))
@@ -1141,10 +1146,10 @@ namespace HarpoonExtended
             if (targetMessagesEnabled.Value)
             {
                 string defaultName = hitObject.name;
-                if (hitObject.TryGetComponent<Piece>(out Piece piece))
+                if (hitObject.TryGetComponent(out Piece piece))
                     return piece.m_name;
 
-                if (hitObject.TryGetComponent<Destructible>(out Destructible destr))
+                if (hitObject.TryGetComponent(out Destructible destr))
                     defaultName = destr.name;
 
                 if (collider.name.StartsWith("Terrain"))
