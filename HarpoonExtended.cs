@@ -17,7 +17,7 @@ namespace HarpoonExtended
         const string pluginName = "Harpoon Extended";
         const string pluginVersion = "1.1.9";
 
-        private Harmony _harmony;
+        private readonly Harmony harmony = new Harmony(pluginID);
 
         internal static readonly ConfigSync configSync = new ConfigSync(pluginID) { DisplayName = pluginName, CurrentVersion = pluginVersion, MinimumRequiredVersion = pluginVersion };
 
@@ -157,7 +157,7 @@ namespace HarpoonExtended
 
         private void Awake()
         {
-            _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), pluginID);
+            harmony.PatchAll();
 
             instance = this;
 
@@ -168,7 +168,7 @@ namespace HarpoonExtended
         private void OnDestroy()
         {
             Config.Save();
-            _harmony?.UnpatchSelf();
+            harmony?.UnpatchSelf();
         }
 
         public static void LogInfo(object data)
