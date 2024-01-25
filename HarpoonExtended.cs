@@ -15,7 +15,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.9";
+        const string pluginVersion = "1.1.10";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -767,6 +767,12 @@ namespace HarpoonExtended
             {
                 // If the target has no rigidbody we should pull to it - set stational target hit point
                 if (deepLoggingEnabled.Value) LogInfo("Pull to object");
+                isPullingTo = true;
+            }
+            else if (objectRbody.isKinematic)
+            {
+                // If target has kinematic rigidbody we should pull to it - set stational target hit point
+                if (deepLoggingEnabled.Value) LogInfo("Pull to kinematic rigidbody");
                 isPullingTo = true;
             }
             else if (pullTo)

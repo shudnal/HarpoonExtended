@@ -1,3 +1,6 @@
+v 1.1.10
+* Seasons compatibility refinements
+
 v 1.1.9
 * dynamic line thickness
 * minor refinements and fixes
