@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using BepInEx;
-using BepInEx.Logging;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
@@ -15,7 +13,7 @@ namespace HarpoonExtended
     {
         const string pluginID = "shudnal.HarpoonExtended";
         const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.10";
+        const string pluginVersion = "1.1.11";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
@@ -700,10 +698,11 @@ namespace HarpoonExtended
                     ((bool)colliderHitObject.GetComponent<Fish>() ? " : Fish" : "") +
                     ((bool)colliderHitObject.GetComponent<Leviathan>() ? " : Leviathan" : "") +
                     ((bool)colliderHitObject.GetComponent<RandomFlyingBird>() ? " : RandomFlyingBird" : "") +
-                    ((bool)colliderHitObject.GetComponent<Location>() ? " : Location" : ""));
+                    ((bool)colliderHitObject.GetComponent<Location>() ? " : Location" : "") +
+                    ((bool)colliderHitObject.GetComponent("ShipMan") ? " : ShipMan" : ""));
 
                 if (targetGround.Value ||
-                    targetShip.Value && (bool)colliderHitObject.GetComponent<Ship>() ||
+                    targetShip.Value && ((bool)colliderHitObject.GetComponent<Ship>() || (bool)colliderHitObject.GetComponent("ShipMan")) ||
                     targetCreatures.Value && (bool)colliderHitObject.GetComponent<Character>() ||
                     targetTreeLog.Value && (bool)colliderHitObject.GetComponent<TreeLog>() ||
                     targetTreeBase.Value && (bool)colliderHitObject.GetComponent<TreeBase>() ||
@@ -749,9 +748,9 @@ namespace HarpoonExtended
             m_lineRenderer = null;
             isPullingTo = false;
 
-            objectRbody = hitObject.GetComponent<Rigidbody>();
-            attackerRbody = attacker.GetComponent<Rigidbody>();
-            
+            objectRbody = hitObject.GetComponent<Rigidbody>() ?? hitObject.GetComponentInChildren<Rigidbody>();
+            attackerRbody = attacker.GetComponent<Rigidbody>() ?? attacker.GetComponentInChildren<Rigidbody>();
+
             objectMass = CalculateHitObjectMass(hitObject);
 
             m_nview = hitObject.GetComponent<ZNetView>();
@@ -830,11 +829,11 @@ namespace HarpoonExtended
 
             LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {objectMass}, pull to: {isPullingTo}");
 
-            noUpForce = (bool)hitObject.GetComponent<Ship>();
+            noUpForce = (bool)hitObject.GetComponent<Ship>() || (bool)hitObject.GetComponent("ShipMan");
 
             if (hitObject.TryGetComponent<Leviathan>(out _))
                 m_minDistance = 20f;  // Just in case because colliding with Levi will launch you in the sky
-            else if (m_ship != null)
+            else if (noUpForce)
                 m_minDistance = minDistanceShip.Value;
             else if (m_character != null)
                 m_minDistance = minDistanceCreature.Value;
