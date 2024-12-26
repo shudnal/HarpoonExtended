@@ -11,9 +11,9 @@ namespace HarpoonExtended
     [BepInPlugin(pluginID, pluginName, pluginVersion)]
     public class HarpoonExtended : BaseUnityPlugin
     {
-        const string pluginID = "shudnal.HarpoonExtended";
-        const string pluginName = "Harpoon Extended";
-        const string pluginVersion = "1.1.11";
+        public const string pluginID = "shudnal.HarpoonExtended";
+        public const string pluginName = "Harpoon Extended";
+        public const string pluginVersion = "1.1.11";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
