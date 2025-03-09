@@ -1,3 +1,7 @@
+# 1.1.12
+* patch 0.220.3
+* ServerSync updated
+
 # 1.1.11
 * bog witch
 
