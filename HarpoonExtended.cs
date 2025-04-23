@@ -13,78 +13,79 @@ namespace HarpoonExtended
     {
         public const string pluginID = "shudnal.HarpoonExtended";
         public const string pluginName = "Harpoon Extended";
-        public const string pluginVersion = "1.1.12";
+        public const string pluginVersion = "2.0.0";
 
         private readonly Harmony harmony = new Harmony(pluginID);
 
         internal static readonly ConfigSync configSync = new ConfigSync(pluginID) { DisplayName = pluginName, CurrentVersion = pluginVersion, MinimumRequiredVersion = pluginVersion };
 
-        private static ConfigEntry<bool> modEnabled;
-        private static ConfigEntry<bool> configLocked;
+        internal static ConfigEntry<bool> modEnabled;
+        internal static ConfigEntry<bool> configLocked;
 
-        private static ConfigEntry<bool> loggingEnabled;
-        private static ConfigEntry<bool> deepLoggingEnabled;
+        internal static ConfigEntry<bool> loggingEnabled;
+        internal static ConfigEntry<bool> deepLoggingEnabled;
 
-        private static ConfigEntry<bool> messagesEnabled;
-        private static ConfigEntry<bool> targetMessagesEnabled;
+        internal static ConfigEntry<bool> messagesEnabled;
+        internal static ConfigEntry<bool> targetMessagesEnabled;
 
-        private static ConfigEntry<float> timeBeforeStop;
-        private static ConfigEntry<bool> applySlowFall;
-        private static ConfigEntry<bool> attachedShipStamina;
-        private static ConfigEntry<bool> pullUnderWater;
-        private static ConfigEntry<bool> removeSlowFallWithoutHarpoon;
-        private static ConfigEntry<float> removeSlowFallonGroundThreshold;
+        internal static ConfigEntry<float> timeBeforeStop;
+        internal static ConfigEntry<bool> applySlowFall;
+        internal static ConfigEntry<bool> attachedShipStamina;
+        internal static ConfigEntry<bool> pullUnderWater;
+        internal static ConfigEntry<bool> removeSlowFallWithoutHarpoon;
+        internal static ConfigEntry<float> removeSlowFallonGroundThreshold;
 
-        private static ConfigEntry<bool> targetPulling;
-        private static ConfigEntry<float> pullSpeedMultiplier;
-        private static ConfigEntry<float> maxBodyMassToPull;
-        private static ConfigEntry<float> containerInventoryWeightMassFactor;
+        internal static ConfigEntry<bool> targetPulling;
+        internal static ConfigEntry<float> pullSpeedMultiplier;
+        internal static ConfigEntry<float> maxBodyMassToPull;
+        internal static ConfigEntry<float> containerInventoryWeightMassFactor;
 
-        private static ConfigEntry<bool> targetCreatures;
-        private static ConfigEntry<bool> targetShip;
-        private static ConfigEntry<bool> targetTreeLog;
-        private static ConfigEntry<bool> targetTreeBase;
-        private static ConfigEntry<bool> targetFish;
-        private static ConfigEntry<bool> targetPiece;
-        private static ConfigEntry<bool> targetDestructibles;
-        private static ConfigEntry<bool> targetLeviathan;
-        private static ConfigEntry<bool> targetItems;
-        private static ConfigEntry<bool> targetBosses;
-        private static ConfigEntry<bool> targetGround;
+        internal static ConfigEntry<bool> targetCreatures;
+        internal static ConfigEntry<bool> targetShip;
+        internal static ConfigEntry<bool> targetTreeLog;
+        internal static ConfigEntry<bool> targetTreeBase;
+        internal static ConfigEntry<bool> targetFish;
+        internal static ConfigEntry<bool> targetPiece;
+        internal static ConfigEntry<bool> targetDestructibles;
+        internal static ConfigEntry<bool> targetLeviathan;
+        internal static ConfigEntry<bool> targetItems;
+        internal static ConfigEntry<bool> targetBosses;
+        internal static ConfigEntry<bool> targetGround;
 
-        private static ConfigEntry<float> breakDistance;
-        private static ConfigEntry<float> maxDistance;
-        private static ConfigEntry<float> drainStamina;
-        private static ConfigEntry<float> minDistanceShip;
-        private static ConfigEntry<float> minDistanceCreature;
-        private static ConfigEntry<float> minDistanceItem;
-        private static ConfigEntry<float> minDistancePullToTarget;
-        private static ConfigEntry<float> minDistancePullToPlayer;
+        internal static ConfigEntry<float> breakDistance;
+        internal static ConfigEntry<float> maxDistance;
+        internal static ConfigEntry<float> drainStamina;
+        internal static ConfigEntry<float> minDistanceShip;
+        internal static ConfigEntry<float> minDistanceCreature;
+        internal static ConfigEntry<float> minDistanceItem;
+        internal static ConfigEntry<float> minDistancePullToTarget;
+        internal static ConfigEntry<float> minDistancePullToPlayer;
 
-        private static ConfigEntry<float> pullSpeed;
-        private static ConfigEntry<float> smoothDistance;
-        private static ConfigEntry<float> pullForceMultiplier;
-        private static ConfigEntry<float> forcePower;
-        private static ConfigEntry<bool> useForce;
-        private static ConfigEntry<bool> alwaysPullTo;
-        private static ConfigEntry<float> maximumVelocity;
+        internal static ConfigEntry<float> pullSpeed;
+        internal static ConfigEntry<float> smoothDistance;
+        internal static ConfigEntry<float> pullForceMultiplier;
+        internal static ConfigEntry<float> forcePower;
+        internal static ConfigEntry<bool> useForce;
+        internal static ConfigEntry<bool> alwaysPullTo;
+        internal static ConfigEntry<float> maximumVelocity;
+        internal static ConfigEntry<bool> alwaysFlee;
 
-        private static ConfigEntry<float> projectileGravityMiltiplier;
-        private static ConfigEntry<float> hitboxSize;
-        private static ConfigEntry<float> projectileVelocityMultiplier;
+        internal static ConfigEntry<float> projectileGravityMiltiplier;
+        internal static ConfigEntry<float> hitboxSize;
+        internal static ConfigEntry<float> projectileVelocityMultiplier;
 
-        private static ConfigEntry<int> maxQuality;
-        private static ConfigEntry<float> durabilityPerLevel;
-        private static ConfigEntry<bool> disableDurability;
-        private static ConfigEntry<float> durabilityDrain;
-        private static ConfigEntry<float> attackStamina;
-        private static ConfigEntry<bool> disableDamage;
-        private static ConfigEntry<bool> disableStamina;
+        internal static ConfigEntry<int> maxQuality;
+        internal static ConfigEntry<float> durabilityPerLevel;
+        internal static ConfigEntry<bool> disableDurability;
+        internal static ConfigEntry<float> durabilityDrain;
+        internal static ConfigEntry<float> attackStamina;
+        internal static ConfigEntry<bool> disableDamage;
+        internal static ConfigEntry<bool> disableStamina;
 
-        private static ConfigEntry<KeyboardShortcut> shortcutPull;
-        private static ConfigEntry<KeyboardShortcut> shortcutPullTo;
-        private static ConfigEntry<KeyboardShortcut> shortcutRelease;
-        private static ConfigEntry<KeyboardShortcut> shortcutStop;
+        internal static ConfigEntry<KeyboardShortcut> shortcutPull;
+        internal static ConfigEntry<KeyboardShortcut> shortcutPullTo;
+        internal static ConfigEntry<KeyboardShortcut> shortcutRelease;
+        internal static ConfigEntry<KeyboardShortcut> shortcutStop;
 
         internal static int s_rayMaskSolidsAndItem = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle", "item");
         internal static int s_rayMaskSolids;
@@ -155,12 +156,14 @@ namespace HarpoonExtended
 
         private void Awake()
         {
-            harmony.PatchAll();
-
             instance = this;
 
             ConfigInit();
             _ = configSync.AddLockingConfigEntry(configLocked);
+
+            LocalizationManager.Localizer.Load();
+
+            harmony.PatchAll();
         }
 
         private void OnDestroy()
@@ -245,6 +248,7 @@ namespace HarpoonExtended
             hitboxSize = config("8 - Debug", "Hitbox size", defaultValue: 0.0f, "Hitbox size. 0.0 min - 0.5 max. You can try to change it if you have difficulties with aiming small targets");
             alwaysPullTo = config("8 - Debug", "Always pull to", defaultValue: false, "Always pull to target regardress hotkey");
             maximumVelocity = config("8 - Debug", "Maximum velocity", defaultValue: 10f, "Maximum velocity imparted to player rigidbody by harpoon pulling");
+            alwaysFlee = config("8 - Debug", "Harpooned target always flee", defaultValue: false, "Make harpooned target ignore other tasks and just try to flee");
         }
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, ConfigDescription description, bool synchronizedSetting = true)
@@ -259,22 +263,22 @@ namespace HarpoonExtended
 
         ConfigEntry<T> config<T>(string group, string name, T defaultValue, string description, bool synchronizedSetting = true) => config(group, name, defaultValue, new ConfigDescription(description), synchronizedSetting);
 
-        private static bool KeyPressStopHarpoon()
+        internal static bool KeyPressStopHarpoon()
         {
             return shortcutStop.Value.IsDown() || ZInput.GetButton("Block") || ZInput.GetButton("JoyBlock");
         }
 
-        private static bool KeyPressReleaseHarpoon()
+        internal static bool KeyPressReleaseHarpoon()
         {
             return (KeyPressPullHarpoon() && (ZInput.GetButton("Crouch") || ZInput.GetButton("JoyCrouch"))) || shortcutRelease.Value.IsPressed();
         }
 
-        private static bool KeyPressPullHarpoon()
+        internal static bool KeyPressPullHarpoon()
         {
             return ZInput.GetButton("Use") || ZInput.GetButton("JoyUse") || shortcutPull.Value.IsPressed();
         }
 
-        private static bool KeyPressPullTo()
+        internal static bool IsKeyPressPullTo()
         {
             return ZInput.GetButton("AltPlace") || ZInput.GetButton("JoyAltPlace") || shortcutPullTo.Value.IsPressed();
         }
@@ -728,7 +732,7 @@ namespace HarpoonExtended
                     if (harpooned == null)
                     {
                         harpooned = Instantiate(ZNetScene.instance.GetPrefab("vfx_Harpooned"), ___m_owner.transform.position, Quaternion.identity, colliderHitObject.transform);
-                        SetHarpooned(Player.m_localPlayer, colliderHitObject, hitPoint, KeyPressPullTo(), collider);
+                        SetHarpooned(Player.m_localPlayer, colliderHitObject, hitPoint, IsKeyPressPullTo(), collider);
                     }
                 }
             }
@@ -825,7 +829,7 @@ namespace HarpoonExtended
             targetHarpooned = hitObject;
             targetDistance = Vector3.Distance(hitPoint, attacker.transform.position); 
 
-            targetName = GetHarpoonedTargetName(hitObject, collider);
+            targetName = GetHarpoonedTargetName(hitObject);
 
             LogInfo($"Attacker: {attacker.m_name}, target: {hitObject.name}, name: {targetName}, mass: {objectMass}, pull to: {isPullingTo}");
 
@@ -1131,7 +1135,7 @@ namespace HarpoonExtended
             return false;
         }
 
-        private static string GetHarpoonedTargetName(GameObject hitObject, Collider collider)
+        internal static string GetHarpoonedTargetName(GameObject hitObject)
         {
             if (hitObject.TryGetComponent(out HoverText text))
                 return text.m_text;
@@ -1157,13 +1161,10 @@ namespace HarpoonExtended
                 if (hitObject.TryGetComponent(out Destructible destr))
                     defaultName = destr.name;
 
-                if (collider.name.StartsWith("Terrain"))
-                    return collider.name;
+                if (hitObject.GetComponentInParent<Heightmap>())
+                    return "Terrain";
 
-                if (defaultName.Length > 1)
-                    return defaultName.ToUpper().Substring(0, 1) + defaultName.Substring(1, defaultName.IndexOf("(") - 1);
-
-                return defaultName;
+                return Utils.GetPrefabName(defaultName);
             }
 
             return String.Empty;

@@ -9,16 +9,20 @@
 	</Target>
 	<Target Name="CopyDLLPackage" AfterTargets="ILRepacker">
 		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)package\thunderstore\$(SolutionName)\" />
-		<Message Text="Copied to package folder." Importance="High" />
+		<Message Text="Copied to thunderstore package folder." Importance="High" />
 	</Target>
-	<Target Name="CopyDLLPlugins" AfterTargets="ILRepacker">
-		<Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\Users\Suden\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\beta\BepInEx\plugins\shudnal-$(SolutionName)\" />
-		<Message Text="Copied to r2 folder." Importance="High" />
+	<Target Name="CopyLanguageFile" AfterTargets="CopyDLLPackage">
+		<Copy SourceFiles="$(ProjectDir)translations\English.json" DestinationFiles="$(ProjectDir)package\thunderstore\$(SolutionName)\$(SolutionName).English.json" />
+		<Message Text="Copied English.json to thunderstore package folder." Importance="High" />
 	</Target>
-	<Target Name="ZipOutputPath" AfterTargets="CopyDLLPackage">
+	<Target Name="ZipOutputPath" AfterTargets="CopyLanguageFile">
 		<ZipDirectory
 				SourceDirectory="$(ProjectDir)package\thunderstore\$(SolutionName)\"
 				DestinationFile="$(ProjectDir)package\thunderstore\$(SolutionName).zip"
 				Overwrite="true"/>
+	</Target>
+	<Target Name="CopyDLLPlugins" AfterTargets="ILRepacker">
+		<Copy SourceFiles="$(TargetPath)" DestinationFolder="D:\r2modman\Valheim\profiles\beta\BepInEx\plugins\shudnal-$(SolutionName)\" />
+		<Message Text="Copied to r2 folder." Importance="High" />
 	</Target>
 </Project>
