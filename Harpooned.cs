@@ -7,58 +7,407 @@ namespace HarpoonExtended
 {
     public class Harpooned : MonoBehaviour, IMonoUpdater
     {
-        private bool m_alwaysPullTo;
+        public class TargetState
+        {
+            public GameObject m_gameObject;
+            public ZNetView m_nview;
 
-        //private Harpooned m_harpooned;
-        private float m_maxLineSlack = 0.3f;
+            public Character m_character;
+            public Rigidbody m_rigidbody;
 
-        private float m_minDistance = 2f;
-        private float m_targetDistance;
+            public Ship m_ship;
+            public BaseAI m_baseAI;
+            public Vagon m_vagon;
+            public Leviathan m_leviathan;
 
-        private GameObject m_harpoonedVFX;
-        private LineConnect m_line;
-        private LineRenderer m_lineRenderer;
+            public float m_objectMass;
 
-        private Vector3 m_hitPoint;
-        private Vector3 m_hitNormal;
+            public ItemDrop m_itemDrop;
+            public Rigidbody[] m_allRBodies;
+            public Container[] m_allContainers;
 
-        private ZNetView m_nview;
+            public bool IsShip {  get; private set; }
 
-        private GameObject m_target;
-        private string m_targetName;
+            public TargetState(GameObject gameObject)
+            {
+                m_gameObject = gameObject;
+                Initialize();
+            }
 
-        private float m_breakDistance = 15f;
-        private float m_maxDistance = 50f;
-        private float m_pullSpeed = 1000f;
-        private float m_smoothDistance = 2f;
-        private float m_staminaDrain = 0.1f;
-        private float m_pullForce;
-        private float m_pullSpeedMultiplier;
+            public void Initialize()
+            {
+                m_nview = m_gameObject.GetComponentInParent<ZNetView>();
+                m_character = m_gameObject.GetComponent<Character>();
+                m_rigidbody = m_gameObject.GetComponent<Rigidbody>() ?? m_gameObject.GetComponentInChildren<Rigidbody>();
 
-        private Ship m_ship;
-        private BaseAI m_baseAI;
+                m_ship = m_gameObject.GetComponentInParent<Ship>();
+                m_baseAI = m_gameObject.GetComponentInParent<BaseAI>();
+                m_vagon = m_gameObject.GetComponentInParent<Vagon>();
+                m_leviathan = m_gameObject.GetComponentInParent<Leviathan>();
 
-        private Character m_attacker;
-        private Character m_targetCharacter;
+                m_itemDrop = m_gameObject.GetComponentInParent<ItemDrop>();
+                m_allRBodies = m_gameObject.GetComponentsInParent<Rigidbody>();
+                m_allContainers = m_gameObject.GetComponentsInParent<Container>();
+                
+                IsShip = m_ship || (bool)m_gameObject.GetComponent("ShipMan");
+            }
 
-        private Rigidbody m_rigidbody;
-        private Rigidbody m_targetRigidbody;
+            public float GetMass()
+            {
+                m_objectMass = 0f;
 
-        private float m_objectMass;
+                m_allRBodies.Do(rb => m_objectMass += rb?.mass ?? 0);
 
-        private bool m_broken;
-        private float m_timeBeforeStop;
-        private bool m_onlyHorizontalForce;
+                if (m_ship == null && m_vagon == null)
+                    m_allContainers.Do(cont => m_objectMass += cont.GetInventory().GetTotalWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value);
+
+                if (m_itemDrop)
+                    m_objectMass += m_itemDrop.m_itemData.GetWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value;
+
+                if (m_character is Humanoid human)
+                    m_objectMass += human.GetInventory().GetTotalWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value;
+
+                return m_objectMass;
+            }
+        }
+
+        public class HarpoonTarget
+        {
+            //public KeyValuePair<int, int> m_peerID;
+
+            public Harpooned m_harpooned;
+
+            public GameObject m_gameObject;
+
+            public bool m_pullToHarpoonedAlways;
+
+            public float m_minDistance = 2f;
+            public float m_targetDistance;
+
+            public GameObject m_harpoonedVFX;
+            public LineConnect m_line;
+            public LineRenderer m_lineRenderer;
+
+            public Vector3 m_hitPoint;
+            public Vector3 m_hitNormal;
+
+            public string m_targetName;
+
+            public float m_breakDistance = 15f;
+            public float m_maxDistance = 50f;
+            public float m_pullSpeed = 1000f;
+            public float m_smoothDistance = 2f;
+            public float m_staminaDrain = 0.1f;
+            public float m_pullForce;
+            public float m_pullSpeedMultiplier;
+
+            public bool m_broken;
+            public float m_timeBeforeStop;
+            public bool m_onlyHorizontalForce;
+
+            public TargetState m_state;
+            public Character m_attacker;
+
+            public bool IsAlwaysPullingToHarpooned => m_pullToHarpoonedAlways || m_state.m_nview == null || HarpoonExtended.alwaysPullTo.Value;
+
+            public bool IsPullingToHarpooned { get; private set; }
+
+            public bool IsDynamicAlwaysPullToHarpooned()
+            {
+                // If harpooned character is attached to something (ship probably)
+                if (m_harpooned.m_state.m_character is Character characterTarget && characterTarget.IsAttached())
+                    return true;
+
+                // If harpooned ship is controlled by other player
+                if (m_harpooned.m_state.m_ship && m_harpooned.m_state.m_ship.HaveControllingPlayer())
+                    return true;
+
+                // If harpooned target mass exceeds the maximum
+                if (m_harpooned.m_state.GetMass() > HarpoonExtended.maxBodyMassToPull.Value)
+                    return true;
+
+                // If harpooned vagon is in use
+                if (m_harpooned.m_state.m_vagon && m_harpooned.m_state.m_vagon.InUse())
+                    return true;
+
+                // if harpooned target is more massive, TODO tweak conditions
+                /*if (m_harpooned.m_state.GetMass() > m_state.GetMass())
+                    return true;*/
+
+                return false;
+            }
+
+            public HarpoonTarget(Harpooned harpooned, GameObject gameObject, Character attacker)
+            {
+                m_harpooned = harpooned;
+                m_gameObject = gameObject;
+                m_attacker = attacker;
+
+                m_state = new TargetState(m_gameObject);
+
+                Initialize();
+            }
+
+            public void Update(float dt)
+            {
+                UpdateHarpoonedVFX();
+                UpdatePullingDirection();
+                UpdateHarpoonEffect(dt);
+
+                if (IsDone())
+                    Destroy();
+            }
+
+            public void UpdatePullingDirection()
+            {
+                IsPullingToHarpooned = IsAlwaysPullingToHarpooned || IsDynamicAlwaysPullToHarpooned();
+            }
+
+            public void UpdateHarpoonedVFX()
+            {
+                // Create child game object in object with Harpooned component
+                // Initialize line connection from hitpoint in Harpooned object to this Harpooned object
+                // Line owner is Harpooned object and line peer is target object
+
+                if (!(bool)m_harpoonedVFX)
+                {
+                    m_harpoonedVFX = HarpoonedVFX.CreateEffect(m_hitPoint, m_harpooned.transform);
+
+                    m_line = m_harpoonedVFX.GetComponent<LineConnect>();
+                    if (m_line)
+                    {
+                        m_line.m_netViewPrefix = $"hrpnext_{m_harpooned.harpoonTargets.IndexOf(this)}_";
+                        m_line.Awake();
+
+                        m_line.m_maxDistance = m_maxDistance;
+                        m_line.m_dynamicThickness = true;
+                        m_line.m_minThickness = 0.04f;
+                        m_line.SetPeer(m_state.m_nview);
+
+                        if (m_gameObject.TryGetComponent<Turret>(out _))
+                            m_line.m_childObject = "Neck";
+                        else if (m_pullToHarpoonedAlways && m_state.m_character && m_state.m_character.IsPlayer())
+                            m_line.m_childObject = "RightArm";
+
+                        m_lineRenderer = m_harpoonedVFX.GetComponent<LineRenderer>();
+                    }
+                }
+            }
+
+            public bool IsDone()
+            {
+                if (m_broken)
+                {
+                    LogInfo("Is broken");
+                    return true;
+                }
+
+                if (m_state.m_nview != null && !m_state.m_nview.IsValid())
+                {
+                    LogInfo("No m_nview");
+                    return true;
+                }
+
+                if (!m_state.m_gameObject)
+                {
+                    LogInfo("No target");
+                    return true;
+                }
+
+                if (m_attacker)
+                {
+                    if (m_attacker == Player.m_localPlayer && m_timeBeforeStop < 0f && (HarpoonExtended.KeyPressStopHarpoon() || m_attacker.IsBlocking()))
+                    {
+                        LogInfo("$msg_harpoon_released");
+                        return true;
+
+                    }
+
+                    if (m_attacker.IsDead() || m_attacker.IsTeleporting() || m_attacker.InCutscene() || m_attacker.IsEncumbered())
+                    {
+                        return true;
+                    }
+                }
+
+                if (m_state.m_character && (m_state.m_character.IsDead() || m_state.m_character.IsTeleporting() || m_state.m_character.InCutscene()))
+                    return true;
+
+                /*if (IsPullingToHarpooned && m_attacker.IsAttached())
+                {
+                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
+                    return true;
+                }*/
+
+                /*if (Ship.GetLocalShip() != null && Ship.GetLocalShip() == m_state.m_ship)
+                {
+                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
+                    return true;
+                }*/
+
+                /*if (IsPullingToHarpooned && !HarpoonExtended.pullUnderWater.Value && TargetPosition().y < ZoneSystem.instance.m_waterLevel)
+                {
+                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
+                    return true;
+                }*/
+
+                return false;
+            }
+
+            public void Destroy()
+            {
+                HarpoonedTargets.Remove(m_gameObject);
+                UnityEngine.Object.DestroyImmediate(m_harpoonedVFX);
+                m_harpooned.harpoonTargets.Remove(this);
+            }
+
+            internal void Initialize()
+            {
+                if (m_gameObject)
+                    HarpoonedTargets[m_gameObject] = this;
+
+                m_breakDistance = HarpoonExtended.breakDistance.Value;
+                m_maxDistance = HarpoonExtended.maxDistance.Value;
+                m_staminaDrain = 0.1f * HarpoonExtended.drainStamina.Value;
+                m_pullSpeed = HarpoonExtended.pullSpeed.Value;
+                m_smoothDistance = HarpoonExtended.smoothDistance.Value;
+                m_pullForce = HarpoonExtended.pullForceMultiplier.Value;
+                m_pullSpeedMultiplier = HarpoonExtended.pullSpeedMultiplier.Value;
+
+                m_timeBeforeStop = HarpoonExtended.timeBeforeStop.Value;
+
+                m_harpooned.harpoonTargets.Add(this);
+            }
+
+            public TargetState StateToPull => IsPullingToHarpooned ? m_state : m_harpooned.m_state;
+            public TargetState StateTarget => IsPullingToHarpooned ? m_harpooned.m_state : m_state;
+
+            public Character CharacterToPull => StateToPull.m_character;
+
+            public void UpdateHarpoonEffect(float dt)
+            {
+                if (m_timeBeforeStop > 0)
+                    m_timeBeforeStop -= dt;
+
+                if (m_lineRenderer.positionCount == 0)
+                    return;
+
+                if (m_broken)
+                    return;
+
+                // If is this target is pulling to harpooned object
+                // RBody to apply force (who is moving)         - that object rbody
+                // Target point (direction)                     - hit point of harpooned
+                // Force point to apply force (where to pull)   - this target object end of line
+
+                // Otherwise if harpooned object is pulling to this target
+                // RBody to apply force (who is moving)         - harpooned object rbody
+                // Target point (direction)                     - this target object end of line
+                // Force point to apply force (where to pull)   - hit point of harpooned
+
+                Vector3 lineStart = m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(0));
+                Vector3 lineEnd = m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(m_lineRenderer.positionCount - 1));
+
+                Vector3 target = IsPullingToHarpooned ? lineStart : lineEnd;
+                Vector3 forcePoint = IsPullingToHarpooned ? lineEnd : lineStart;
+
+                float distance = Vector3.Distance(target, forcePoint);
+
+                if (distance < m_minDistance)
+                {
+                    //HarpoonMessage("$msg_harpoon_released");
+                    //Destroy();// Harpooned("Too close");
+                    m_broken = true;
+                    return;
+                }
+
+                float massToPull = StateToPull.GetMass();
+
+                float pullForce;
+                if (IsPullingToHarpooned)
+                    pullForce = 1f;
+                else if (massToPull > 999)
+                    pullForce = 1f;
+                else if (massToPull <= 1f)
+                    pullForce = 0.05f * m_pullForce;
+                else
+                {
+                    float mass = StateTarget.GetMass();
+                    if (mass == 0f)
+                        mass = massToPull;
+                    
+                    pullForce = (1f - (1f / Mathf.Sqrt(massToPull))) * (mass / massToPull) * m_pullForce;
+                }
+
+                float pullSpeed = (m_attacker != null && m_attacker.IsAttachedToShip()) ? 10000f : m_pullSpeed;
+
+                float num2 = Pull(StateToPull.m_rigidbody, target, m_targetDistance, pullSpeed, pullForce, m_smoothDistance, forcePoint, StateToPull.m_character != null && !StateToPull.m_character.IsFlying(), m_onlyHorizontalForce, HarpoonExtended.useForce.Value, HarpoonExtended.forcePower.Value);
+                /*m_drainStaminaTimer += dt; float stamina = 0f;
+                if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
+                {
+                    m_drainStaminaTimer = 0f;
+                    if (!attachedShipStamina.Value || IsPullingTo() || !m_attacker.IsAttachedToShip())
+                    {
+                        stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
+                        m_attacker.UseStamina(stamina);
+                    }
+                }*/
+
+                if ((bool)m_line)
+                {
+                    m_line.SetSlack((1f - Utils.LerpStep(m_targetDistance / 2f, m_targetDistance, distance)) * m_maxLineSlack);
+                }
+
+                LogDeepInfo(data: $"dist: {distance,-5:F3} " +
+                                                      $"targetDist: {m_targetDistance,-5:F3} " +
+                                                      $"force: {pullForce,-5:F3} " +
+                                                      $"dt: {num2,-5:F3} " +
+                                                      //$"stam: {stamina,-5:F3} " +
+                                                      $"break: {distance - m_targetDistance,-5:F3} < {m_breakDistance}");
+
+                if (distance - m_targetDistance > m_breakDistance)
+                {
+                    m_broken = true;
+                    //HarpoonMessage("$msg_harpoon_linebroke");
+                    //LogInfo("Line broke");
+                }
+
+                if (m_attacker != null && !m_attacker.HaveStamina())
+                {
+                    m_broken = true;
+                    //HarpoonMessage("$msg_harpoon_released");
+                    //LogInfo("Stamina depleted");
+                }
+
+                if (!IsDone())
+                {
+                    if (m_attacker == Player.m_localPlayer && HarpoonExtended.targetPulling.Value && (HarpoonExtended.KeyPressPullHarpoon() || HarpoonExtended.KeyPressReleaseHarpoon()) && !HarpoonExtended.KeyPressStopHarpoon())
+                    {
+                        float factorMass = IsPullingToHarpooned ? 4f : 2f;
+
+                        if (HarpoonExtended.KeyPressReleaseHarpoon())
+                            m_targetDistance += factorMass * dt * 2f * m_pullSpeedMultiplier;
+                        else if (HarpoonExtended.KeyPressPullHarpoon())
+                            m_targetDistance -= factorMass * dt * m_pullSpeedMultiplier;
+
+                        m_targetDistance = Mathf.Max(m_targetDistance, m_minDistance + 0.5f);
+                    }
+                }
+            }
+        }
+
+        public static float m_maxLineSlack = 0.3f;
+
+        private TargetState m_state;
+
+        private List<HarpoonTarget> harpoonTargets = new List<HarpoonTarget>();
 
         public static Dictionary<BaseAI, Harpooned> HarpoonedAI = new Dictionary<BaseAI, Harpooned>();
-        public static List<GameObject> HarpoonedTargets = new List<GameObject>();
+        public static Dictionary<GameObject, HarpoonTarget> HarpoonedTargets = new Dictionary<GameObject, HarpoonTarget>();
         public static List<IMonoUpdater> Instances { get; } = new List<IMonoUpdater>();
 
         public void Awake()
         {
-            m_nview = GetComponentInParent<ZNetView>();
-            m_ship = GetComponentInParent<Ship>();
-            m_baseAI = GetComponentInParent<BaseAI>();
+            m_state = new TargetState(gameObject);
         }
 
         public void OnEnable()
@@ -73,9 +422,9 @@ namespace HarpoonExtended
 
         public void OnDestroy()
         {
-            HarpoonedTargets.Remove(m_target);
-            HarpoonedAI.Remove(m_baseAI);
-            UnityEngine.Object.Destroy(m_harpoonedVFX);
+            HarpoonedAI.Remove(m_state.m_baseAI);
+            for (int i = harpoonTargets.Count - 1; i >= 0; i--)
+                harpoonTargets[i]?.Destroy();
         }
 
         public void Destroy()
@@ -85,15 +434,15 @@ namespace HarpoonExtended
 
         public void CustomFixedUpdate(float deltaTime)
         {
-            if (IsDone())
+            for (int i = harpoonTargets.Count - 1; i >= 0; i--)
             {
-                Destroy();
-                return;
+                HarpoonTarget target = harpoonTargets[i];
+
+                target?.Update(deltaTime);
             }
 
-            UpdateHarpoonedVFX();
-
-            UpdateHarpoonEffect(deltaTime);
+            if (harpoonTargets.Count == 0)
+                Destroy();
         }
 
         public void CustomUpdate(float deltaTime, float time)
@@ -104,31 +453,7 @@ namespace HarpoonExtended
         {
         }
 
-        private void UpdateHarpoonedVFX()
-        {
-            if (!(bool)m_harpoonedVFX)
-            {
-                m_harpoonedVFX = HarpoonedVFX.CreateEffect(TargetPosition(), transform);
-
-                m_line = m_harpoonedVFX.GetComponent<LineConnect>();
-                if (m_line)
-                {
-                    m_line.m_netViewPrefix = "hrpnext_1_";
-                    m_line.Awake();
-
-                    m_line.m_maxDistance = m_maxDistance;
-                    m_line.m_dynamicThickness = true;
-                    m_line.m_minThickness = 0.04f;
-                    m_line.SetPeer(m_target.GetComponentInParent<ZNetView>());
-
-                    if (m_target.TryGetComponent<Turret>(out _))
-                        m_line.m_childObject = "Neck";
-
-                    m_lineRenderer = m_harpoonedVFX.GetComponent<LineRenderer>();
-                    m_lineRenderer.transform.position = m_hitPoint;
-                }
-            }
-        }
+        public HarpoonTarget AddHarpoonTarget(GameObject gameObject, Character attacker) => new HarpoonTarget(this, gameObject, attacker);
 
         internal static bool IsValidTarget(GameObject attacker, GameObject hitObject)
         {
@@ -141,6 +466,25 @@ namespace HarpoonExtended
             return true;
         }
 
+        internal void Initialize()
+        {
+            if (m_state.m_baseAI)
+                HarpoonedAI[m_state.m_baseAI] = this;
+        }
+
+        public Vector3 GetAveragePosition()
+        {
+            if (harpoonTargets == null || harpoonTargets.Count == 0)
+                return Vector3.zero;
+
+            Vector3 sum = Vector3.zero;
+            
+            foreach (var target in harpoonTargets)
+                sum += target.m_gameObject.transform.position;
+
+            return sum / harpoonTargets.Count;
+        }
+
         internal static void SetHarpooned(GameObject attacker, GameObject hitObject, Vector3 hitPoint, Vector3 hitNormal)
         {
             if (!IsValidTarget(attacker, hitObject))
@@ -149,39 +493,37 @@ namespace HarpoonExtended
             bool isAlwaysPulling = IsAttackerPullingToTarget(attacker, hitObject);
 
             GameObject harpoonedObject = isAlwaysPulling ? attacker : hitObject;
+            GameObject harpoonTarget = isAlwaysPulling ? hitObject : attacker;
 
             HarpoonExtended.LogInfo($"SetHarpooned {isAlwaysPulling} {attacker} {hitObject} {hitPoint} {hitNormal}");
-            if (harpoonedObject.TryGetComponent<Harpooned>(out _))
-                return;
 
-            Harpooned harpooned = harpoonedObject.AddComponent<Harpooned>();
-            harpooned.m_alwaysPullTo = isAlwaysPulling;
-            harpooned.m_target = isAlwaysPulling ? hitObject : attacker;
-            harpooned.m_hitNormal = hitNormal;
-            harpooned.m_hitPoint = hitObject.TryGetComponent(out Character hitCharacter) ? Vector3.Lerp(hitPoint, hitCharacter.GetCenterPoint(), 0.5f) : hitPoint;
+            if (!harpoonedObject.TryGetComponent(out Harpooned harpooned))
+                harpooned = harpoonedObject.AddComponent<Harpooned>();
 
-            if (hitObject.TryGetComponent<ItemDrop>(out _))
-                harpooned.m_pullSpeed = 100f;
+            HarpoonTarget target = harpooned.AddHarpoonTarget(harpoonTarget, attacker.GetComponent<Character>());
 
-            harpooned.m_targetDistance = Vector3.Distance(hitPoint, attacker.transform.position);
-            harpooned.m_attacker = attacker.GetComponent<Character>();
-            harpooned.m_targetName = HarpoonExtended.GetHarpoonedTargetName(hitObject);
+            target.m_pullToHarpoonedAlways = isAlwaysPulling;
+            target.m_hitNormal = hitNormal;
+            target.m_hitPoint = hitObject.TryGetComponent(out Character hitCharacter) ? Vector3.Lerp(hitPoint, hitCharacter.GetCenterPoint(), 0.1f) : hitPoint;
 
-            harpooned.m_rigidbody = hitObject.GetComponent<Rigidbody>() ?? hitObject.GetComponentInChildren<Rigidbody>();
-            harpooned.m_targetRigidbody = attacker.GetComponent<Rigidbody>() ?? attacker.GetComponentInChildren<Rigidbody>();
+            if (harpooned.m_state.m_itemDrop || target.m_state.m_itemDrop)
+                target.m_pullSpeed = 100f;
 
-            if (hitObject.TryGetComponent<Leviathan>(out _))
-                harpooned.m_minDistance = 20f;  // Just in case because colliding with Levi will launch you in the sky
-            else if (harpooned.m_onlyHorizontalForce = (hitObject.TryGetComponent(out harpooned.m_ship) || (bool)hitObject.GetComponent("ShipMan")))
-                harpooned.m_minDistance = HarpoonExtended.minDistanceShip.Value;
-            else if (hitObject.TryGetComponent<Character>(out _))
-                harpooned.m_minDistance = HarpoonExtended.minDistanceCreature.Value;
-            else if (hitObject.TryGetComponent<ItemDrop>(out _))
-                harpooned.m_minDistance = HarpoonExtended.minDistanceItem.Value;
+            target.m_targetDistance = Vector3.Distance(hitPoint, attacker.transform.position);
+            target.m_targetName = HarpoonExtended.GetHarpoonedTargetName(hitObject);
+
+            if (harpooned.m_state.m_leviathan || target.m_state.m_leviathan) // Just in case because colliding with Levi will launch you in the sky
+                target.m_minDistance = 20f;
+            else if (target.m_onlyHorizontalForce = target.m_state.IsShip)
+                target.m_minDistance = HarpoonExtended.minDistanceShip.Value;
+            else if (harpooned.m_state.m_character || target.m_state.m_character)
+                target.m_minDistance = harpooned.m_state.m_character?.GetRadius() ?? 0 + target.m_state.m_character?.GetRadius() ?? 0 + HarpoonExtended.minDistanceCreature.Value;
+            else if (harpooned.m_state.m_itemDrop || target.m_state.m_itemDrop)
+                target.m_minDistance = HarpoonExtended.minDistanceItem.Value;
             else if (isAlwaysPulling)
-                harpooned.m_minDistance = HarpoonExtended.minDistancePullToTarget.Value;
+                target.m_minDistance = HarpoonExtended.minDistancePullToTarget.Value;
             else
-                harpooned.m_minDistance = HarpoonExtended.minDistancePullToPlayer.Value;
+                target.m_minDistance = HarpoonExtended.minDistancePullToPlayer.Value;
 
             harpooned.Initialize();
         }
@@ -216,37 +558,6 @@ namespace HarpoonExtended
                 return true;
             }
 
-            /*if (hitObject.GetComponent<Character>() is Character characterTarget && characterTarget.IsAttached())
-            {
-                // You can't move attached Character
-                LogDeepInfo(attacker, "Can't pull attached");
-                return true;
-            }
-
-            if (hitObject.GetComponent<Ship>() is Ship shipTarget) 
-            {
-                if (shipTarget.HaveControllingPlayer())
-                {
-                    // You can't move already moving ship
-                    LogDeepInfo(attacker, "Can't pull already controlled ship");
-                    return true;
-                }
-
-                float objectMass = CalculateHitObjectMass(hitObject);
-                if (shipTarget == null && objectMass > HarpoonExtended.maxBodyMassToPull.Value)
-                {
-                    LogDeepInfo(attacker, $"Can't pull object {objectRbody} with mass {objectMass} more that {HarpoonExtended.maxBodyMassToPull.Value}");
-                    return true;
-                }
-            }
-
-            if (hitObject.TryGetComponent(out Vagon vagon) && vagon.InUse())
-            {
-                // You can't move already moving vagon
-                LogDeepInfo(attacker, "Can't pull already moving vagon");
-                return true;
-            }*/
-
             if (!(bool)hitObject.GetComponent<ZSyncTransform>())
             {
                 LogDeepInfo(attacker, "Can't pull not netsynchronized object");
@@ -266,189 +577,7 @@ namespace HarpoonExtended
             return false;
         }
 
-        internal void Initialize()
-        {
-            if (m_target)
-                HarpoonedTargets.Add(m_target);
-
-            if (m_baseAI)
-                HarpoonedAI.Add(m_baseAI, this);
-
-            m_breakDistance = HarpoonExtended.breakDistance.Value;
-            m_maxDistance = HarpoonExtended.maxDistance.Value;
-            m_staminaDrain = 0.1f * HarpoonExtended.drainStamina.Value;
-            m_pullSpeed = HarpoonExtended.pullSpeed.Value;
-            m_smoothDistance = HarpoonExtended.smoothDistance.Value;
-            m_pullForce = HarpoonExtended.pullForceMultiplier.Value;
-            m_pullSpeedMultiplier = HarpoonExtended.pullSpeedMultiplier.Value;
-
-            m_targetCharacter = m_target?.GetComponent<Character>();
-            m_timeBeforeStop = HarpoonExtended.timeBeforeStop.Value;
-
-            UpdateObjectMass();
-        }
-
-        public bool IsPullingTo()
-        {
-            return m_alwaysPullTo || m_nview == null || !m_nview.IsOwner() || HarpoonExtended.alwaysPullTo.Value;
-        }
-
-        public Rigidbody RBody()
-        {
-            return IsPullingTo() ? m_targetRigidbody : m_rigidbody;
-        }
-
-        public float Mass()
-        {
-            return IsPullingTo() ? m_targetRigidbody.mass + GetInventoryWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value : m_objectMass;
-        }
-
-        public float GetInventoryWeight() => m_attacker is Humanoid human ? human.GetInventory().GetTotalWeight() : 0f;
-
-        public Vector3 TargetPosition()
-        {
-            return IsPullingTo() ? m_lineRenderer.transform.position : m_target.transform.position;
-        }
-
-        public void UpdateHarpoonEffect(float dt)
-        {
-            if (m_timeBeforeStop > 0)
-                m_timeBeforeStop -= dt;
-
-            float distance = Vector3.Distance(TargetPosition(), RBody().transform.position);
-
-            if (distance < m_minDistance)
-            {
-                //HarpoonMessage("$msg_harpoon_released");
-                Destroy();// Harpooned("Too close");
-                return;
-            }
-
-            Vector3 forcePoint = m_lineRenderer.transform.position;
-
-            float pullForce;
-            if (m_alwaysPullTo)
-                pullForce = 1f;
-            else if (Mass() > 999)
-                pullForce = 1f;
-            else if (Mass() <= 1f)
-                pullForce = 0.05f * m_pullForce;
-            else
-                pullForce = (1f - (1f / Mathf.Sqrt(Mass()))) * (RBody().mass / Mass()) * m_pullForce;
-
-            float pullSpeed = (m_attacker != null && m_attacker.IsAttachedToShip() && (bool)m_ship) ? 10000f : m_pullSpeed;
-
-            float num2 = Pull(RBody(), TargetPosition(), m_targetDistance, pullSpeed, pullForce, m_smoothDistance, IsPullingTo() ? Vector3.zero : forcePoint, m_targetCharacter != null, m_onlyHorizontalForce, HarpoonExtended.useForce.Value, HarpoonExtended.forcePower.Value);
-            /*m_drainStaminaTimer += dt; float stamina = 0f;
-            if (m_drainStaminaTimer > m_staminaDrainInterval && num2 > 0f)
-            {
-                m_drainStaminaTimer = 0f;
-                if (!attachedShipStamina.Value || IsPullingTo() || !m_attacker.IsAttachedToShip())
-                {
-                    stamina = m_staminaDrain * num2 * (IsPullingTo() ? 10f : Mass() > 999 ? 20f : 10f + 20f * pullForce); // Mathf.Clamp(Mathf.Sqrt(mass), 10f, 30f));
-                    m_attacker.UseStamina(stamina);
-                }
-            }*/
-
-            if ((bool)m_line)
-            {
-                m_line.SetSlack((1f - Utils.LerpStep(m_targetDistance / 2f, m_targetDistance, distance)) * m_maxLineSlack);
-            }
-
-            LogDeepInfo(data:$"dist: {distance,-5:F3} " +
-                                                  $"targetDist: {m_targetDistance,-5:F3} " +
-                                                  $"force: {pullForce,-5:F3} " +
-                                                  $"dt: {num2,-5:F3} " +
-                                                  //$"stam: {stamina,-5:F3} " +
-                                                  $"break: {distance - m_targetDistance,-5:F3} < {m_breakDistance}");
-
-            if (distance - m_targetDistance > m_breakDistance)
-            {
-                m_broken = true;
-                //HarpoonMessage("$msg_harpoon_linebroke");
-                //LogInfo("Line broke");
-            }
-
-            if (m_attacker != null && !m_attacker.HaveStamina())
-            {
-                m_broken = true;
-                //HarpoonMessage("$msg_harpoon_released");
-                //LogInfo("Stamina depleted");
-            }
-
-            if (!IsDone())
-            {
-                if (m_attacker == Player.m_localPlayer && HarpoonExtended.targetPulling.Value && (HarpoonExtended.KeyPressPullHarpoon() || HarpoonExtended.KeyPressReleaseHarpoon()) && !HarpoonExtended.KeyPressStopHarpoon())
-                {
-                    float factorMass = IsPullingTo() ? 4f : 2f;
-
-                    if (HarpoonExtended.KeyPressReleaseHarpoon())
-                        m_targetDistance += factorMass * dt * 2f * m_pullSpeedMultiplier;
-                    else if (HarpoonExtended.KeyPressPullHarpoon())
-                        m_targetDistance -= factorMass * dt * m_pullSpeedMultiplier;
-
-                    m_targetDistance = Mathf.Max(m_targetDistance, m_minDistance + 0.5f);
-                }
-            }
-        }
-
         public static void LogInfo(object data) => HarpoonExtended.LogInfo(data);
-
-        public bool IsDone()
-        {
-            if (m_broken)
-            {
-                LogInfo("Is broken");
-                return true;
-            }
-
-            if (m_nview == null || !m_nview.IsValid())
-            {
-                LogInfo("No m_nview");
-                return true;
-            }
-
-            if (!m_target)
-            {
-                LogInfo("No target");
-                return true;
-            }
-
-            if (m_attacker)
-            {
-                if (m_timeBeforeStop < 0f && (HarpoonExtended.KeyPressStopHarpoon() || m_attacker.IsBlocking()))
-                {
-                    LogInfo("$msg_harpoon_released");
-                    return true;
-                }
-
-                if (m_attacker.IsDead() || m_attacker.IsTeleporting() || m_attacker.InCutscene() || m_attacker.IsEncumbered())
-                {
-
-                    return true;
-                }
-
-                if (IsPullingTo() && m_attacker.IsAttached())
-                {
-                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
-                    return true;
-                }
-
-                if (Ship.GetLocalShip() != null && Ship.GetLocalShip() == m_ship)
-                {
-                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
-                    return true;
-                }
-
-                if (IsPullingTo() && !HarpoonExtended.pullUnderWater.Value && TargetPosition().y < ZoneSystem.instance.m_waterLevel)
-                {
-                    m_attacker.Message(MessageHud.MessageType.Center, "$msg_wontwork");
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         public static float Pull(Rigidbody body, Vector3 target, float targetDistance, float speed, float force, float smoothDistance, Vector3 forcePoint, bool checkFreezeRotation = false, bool noUpForce = false, bool useForce = false, float power = 1f)
         {
@@ -496,23 +625,6 @@ namespace HarpoonExtended
             return num;
         }
 
-        public float UpdateObjectMass()
-        {
-            if (!m_target)
-                return 0f;
-
-            float objectMass = 0f;
-
-            m_target.GetComponentsInChildren<Rigidbody>().Do(rb => objectMass += rb.mass);
-
-            if (m_ship == null && !m_target.GetComponent<Vagon>())
-                m_target.GetComponentsInChildren<Container>().Do(cont => objectMass += cont.GetInventory().GetTotalWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value);
-
-            if (m_target.TryGetComponent(out ItemDrop item))
-                objectMass += item.m_itemData.GetWeight() * HarpoonExtended.containerInventoryWeightMassFactor.Value;
-
-            return objectMass;
-        }
 
         internal static void LogDeepInfo(GameObject attacker = null, object data = null)
         {

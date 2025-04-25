@@ -100,8 +100,6 @@ namespace HarpoonExtended
     [HarmonyPatch(typeof(Turret), nameof(Turret.ShootProjectile))]
     public static class Turret_ShootProjectile_SetTurretOwner
     {
-        private static bool Prefix(Turret __instance) => !Harpooned.HarpoonedTargets.Contains(__instance.gameObject);
-
         private static void Postfix(Turret __instance)
         {
             if (!__instance.m_nview.IsOwner())
