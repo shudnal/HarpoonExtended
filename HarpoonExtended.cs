@@ -242,9 +242,9 @@ namespace HarpoonExtended
             shortcutRelease = config("7 - Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[1] { KeyCode.LeftControl }), "Release line [Not Synced with Server]", false);
             shortcutStop = config("7 - Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[2] { KeyCode.LeftShift, KeyCode.LeftControl }), "Stop harpooning [Not Synced with Server]", false);
 
-            interactPull = config("9 - Interaction Shortcuts", "Pull", defaultValue: new KeyboardShortcut(KeyCode.LeftShift), "Pull target closer if applicable [Not Synced with Server]", false);
-            interactRelease = config("9 - Interaction Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftAlt), "Release line [Not Synced with Server]", false);
-            interactStop = config("9 - Interaction Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftAlt, KeyCode.LeftControl ), "Stop harpooning [Not Synced with Server]", false);
+            interactPull = config("9 - Interaction Shortcuts", "Pull", defaultValue: new KeyboardShortcut(KeyCode.E, KeyCode.LeftShift), "Pull target closer if applicable [Not Synced with Server]", false);
+            interactRelease = config("9 - Interaction Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.E, KeyCode.LeftShift, KeyCode.LeftAlt), "Release line [Not Synced with Server]", false);
+            interactStop = config("9 - Interaction Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.E, KeyCode.LeftShift, KeyCode.LeftControl ), "Stop harpooning [Not Synced with Server]", false);
 
             pullSpeed = config("8 - Debug", "Pull speed", defaultValue: 1000f, "[Math] Pull speed of static line. Used in velocity math. No actual need to mess with it.");
             pullForceMultiplier = config("8 - Debug", "Pull force multiplier", defaultValue: 1f, "[Math] Pull force multiplier. Depends on moved body mass. No actual need to mess with it.");
