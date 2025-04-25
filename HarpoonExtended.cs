@@ -87,6 +87,10 @@ namespace HarpoonExtended
         internal static ConfigEntry<KeyboardShortcut> shortcutRelease;
         internal static ConfigEntry<KeyboardShortcut> shortcutStop;
 
+        internal static ConfigEntry<KeyboardShortcut> interactPull;
+        internal static ConfigEntry<KeyboardShortcut> interactRelease;
+        internal static ConfigEntry<KeyboardShortcut> interactStop;
+
         internal static int s_rayMaskSolidsAndItem = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "character", "character_net", "character_ghost", "hitbox", "character_noenv", "vehicle", "item");
         internal static int s_rayMaskSolids;
 
@@ -237,6 +241,10 @@ namespace HarpoonExtended
             shortcutPullTo = config("7 - Shortcuts", "Pull To Target mode", defaultValue: new KeyboardShortcut(KeyCode.LeftShift), "Hold why harpoon is flying to make you always pull to target [Not Synced with Server]", false);
             shortcutRelease = config("7 - Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[1] { KeyCode.LeftControl }), "Release line [Not Synced with Server]", false);
             shortcutStop = config("7 - Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.T, new KeyCode[2] { KeyCode.LeftShift, KeyCode.LeftControl }), "Stop harpooning [Not Synced with Server]", false);
+
+            interactPull = config("9 - Interaction Shortcuts", "Pull", defaultValue: new KeyboardShortcut(KeyCode.LeftShift), "Pull target closer if applicable [Not Synced with Server]", false);
+            interactRelease = config("9 - Interaction Shortcuts", "Release", defaultValue: new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftAlt), "Release line [Not Synced with Server]", false);
+            interactStop = config("9 - Interaction Shortcuts", "Stop harpooning", defaultValue: new KeyboardShortcut(KeyCode.LeftShift, KeyCode.LeftAlt, KeyCode.LeftControl ), "Stop harpooning [Not Synced with Server]", false);
 
             pullSpeed = config("8 - Debug", "Pull speed", defaultValue: 1000f, "[Math] Pull speed of static line. Used in velocity math. No actual need to mess with it.");
             pullForceMultiplier = config("8 - Debug", "Pull force multiplier", defaultValue: 1f, "[Math] Pull force multiplier. Depends on moved body mass. No actual need to mess with it.");

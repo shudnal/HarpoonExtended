@@ -282,7 +282,9 @@ namespace HarpoonExtended
             public TargetState StateTarget => IsPullingToHarpooned ? m_harpooned.m_state : m_state;
 
             public Character CharacterToPull => StateToPull.m_character;
-
+            public Vector3 LineStart => m_lineRenderer == null || m_lineRenderer.positionCount == 0 ? Vector3.zero : m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(0));
+            public Vector3 LineEnd => m_lineRenderer == null || m_lineRenderer.positionCount == 0 ? Vector3.zero : m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(m_lineRenderer.positionCount - 1));
+            public float LineLength => Vector3.Distance(LineStart, LineEnd);
             public void UpdateHarpoonEffect(float dt)
             {
                 if (m_timeBeforeStop > 0)
@@ -304,13 +306,10 @@ namespace HarpoonExtended
                 // Target point (direction)                     - this target object end of line
                 // Force point to apply force (where to pull)   - hit point of harpooned
 
-                Vector3 lineStart = m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(0));
-                Vector3 lineEnd = m_lineRenderer.transform.TransformPoint(m_lineRenderer.GetPosition(m_lineRenderer.positionCount - 1));
+                Vector3 target = IsPullingToHarpooned ? LineStart : LineEnd;
+                Vector3 forcePoint = IsPullingToHarpooned ? LineEnd: LineStart;
 
-                Vector3 target = IsPullingToHarpooned ? lineStart : lineEnd;
-                Vector3 forcePoint = IsPullingToHarpooned ? lineEnd : lineStart;
-
-                float distance = Vector3.Distance(target, forcePoint);
+                float distance = LineLength;
 
                 if (distance < m_minDistance)
                 {
@@ -378,21 +377,28 @@ namespace HarpoonExtended
                     //LogInfo("Stamina depleted");
                 }
 
-                if (!IsDone())
+                /*if (!IsDone())
                 {
                     if (m_attacker == Player.m_localPlayer && HarpoonExtended.targetPulling.Value && (HarpoonExtended.KeyPressPullHarpoon() || HarpoonExtended.KeyPressReleaseHarpoon()) && !HarpoonExtended.KeyPressStopHarpoon())
                     {
-                        float factorMass = IsPullingToHarpooned ? 4f : 2f;
-
-                        if (HarpoonExtended.KeyPressReleaseHarpoon())
-                            m_targetDistance += factorMass * dt * 2f * m_pullSpeedMultiplier;
-                        else if (HarpoonExtended.KeyPressPullHarpoon())
-                            m_targetDistance -= factorMass * dt * m_pullSpeedMultiplier;
-
-                        m_targetDistance = Mathf.Max(m_targetDistance, m_minDistance + 0.5f);
                     }
-                }
+                }*/
             }
+
+            public void PullLine() => ChangeDistance(-Time.fixedDeltaTime);
+
+            public void ReleaseLine() => ChangeDistance(Time.fixedDeltaTime * 2f);
+
+            private void ChangeDistance(float dt)
+            {
+                float factorMass = IsPullingToHarpooned ? 4f : 2f;
+
+                m_targetDistance += factorMass * dt * 2f * m_pullSpeedMultiplier;
+
+                m_targetDistance = Mathf.Max(m_targetDistance, m_minDistance + 0.5f);
+            }
+            
+            public string GetStateString() => $"Target distance: {m_targetDistance:F2}, Break {Mathf.Clamp01((LineLength - m_targetDistance) / m_breakDistance):P0}";
         }
 
         public static float m_maxLineSlack = 0.3f;

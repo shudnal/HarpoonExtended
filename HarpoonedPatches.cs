@@ -1,4 +1,7 @@
 ﻿using HarmonyLib;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using static HarpoonExtended.HarpoonExtended;
 
@@ -85,6 +88,71 @@ namespace HarpoonExtended
             {
                 if (__state != 0f)
                     __instance.m_horizontalAngle = __state;
+            }
+        }
+
+        [HarmonyPatch]
+        public static class ControlHover
+        {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                return typeof(Player).Assembly.GetTypes()
+                    .Where(p => typeof(Hoverable).IsAssignableFrom(p))
+                    .Where(p => p.Name != "Hoverable")
+                    .SelectMany(t => new List<MethodBase>() { AccessTools.Method(t, "GetHoverText") });
+            }
+
+            public static void Postfix(object __instance, ref string __result)
+            {
+                if (__instance is not MonoBehaviour behaviour)
+                    return;
+
+                if (!IsHarpoonedTarget(behaviour.gameObject))
+                    return;
+
+                __result += $"\n{Harpooned.HarpoonedTargets[behaviour.gameObject].GetStateString()}\n[{interactPull.Value}] Pull\n[{interactRelease.Value}] Loose\n[{interactStop.Value}] Break";
+            }
+        }
+
+        [HarmonyPatch]
+        public static class ControlInteract
+        {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                return typeof(Player).Assembly.GetTypes()
+                    .Where(p => typeof(Interactable).IsAssignableFrom(p))
+                    .Where(p => p.Name != "Interactable")
+                    .SelectMany(t => new List<MethodBase>() { AccessTools.Method(t, "Interact") });
+            }
+
+            // Humanoid user, bool hold, bool alt
+            public static bool Prefix(object __instance, Humanoid __0, bool __1, bool __2, ref bool __result)
+            {
+                if (__instance is not MonoBehaviour behaviour)
+                    return true;
+
+                if (!IsHarpoonedTarget(behaviour.gameObject))
+                    return true;
+
+                if (interactPull.Value.IsPressed())
+                {
+                    Harpooned.HarpoonedTargets[behaviour.gameObject].PullLine();
+                    __result = true;
+                }
+
+                if (interactRelease.Value.IsPressed())
+                {
+                    Harpooned.HarpoonedTargets[behaviour.gameObject].ReleaseLine();
+                    __result = true;
+                }
+
+                if (interactStop.Value.IsPressed())
+                {
+                    Harpooned.HarpoonedTargets[behaviour.gameObject].Destroy();
+                    __result = true;
+                }
+
+                return !__result;
             }
         }
     }
