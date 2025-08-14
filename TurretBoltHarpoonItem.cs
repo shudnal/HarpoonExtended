@@ -61,12 +61,15 @@ namespace HarpoonExtended
             if (!(bool)turretBoltHarpoonPrefab)
                 return;
 
+            ItemDrop.ItemData itemData = turretBoltHarpoonPrefab.GetComponent<ItemDrop>()?.m_itemData;
             //PatchTurretBoltHarpoonItem(turretBoltHarpoonPrefab.GetComponent<ItemDrop>()?.m_itemData, inventoryItemUpdate: false);
 
             if (ObjectDB.instance && !ObjectDB.instance.m_itemByHash.ContainsKey(itemHash))
             {
                 ObjectDB.instance.m_items.Add(turretBoltHarpoonPrefab);
                 ObjectDB.instance.m_itemByHash.Add(itemHash, turretBoltHarpoonPrefab);
+                if (itemData != null)
+                    ObjectDB.instance.m_itemByData[itemData.m_shared] = turretBoltHarpoonPrefab;
             }
 
             if (ZNetScene.instance && !ZNetScene.instance.m_namedPrefabs.ContainsKey(itemHash))
