@@ -727,14 +727,13 @@ namespace HarpoonExtended
 
                     if (harpooned == null)
                     {
-                        harpooned = Instantiate(ZNetScene.instance.GetPrefab("vfx_Harpooned"), ___m_owner.transform.position, Quaternion.identity, colliderHitObject.transform);
-                        SetHarpooned(Player.m_localPlayer, colliderHitObject, hitPoint, KeyPressPullTo(), collider);
+                        SetHarpooned(Player.m_localPlayer, colliderHitObject, hitPoint, KeyPressPullTo(), collider, ___m_owner.transform.position);
                     }
                 }
             }
         }
 
-        public static void SetHarpooned(Player attacker, GameObject hitObject, Vector3 hitPoint, bool pullTo, Collider collider)
+        public static void SetHarpooned(Player attacker, GameObject hitObject, Vector3 hitPoint, bool pullTo, Collider collider, Vector3 harpoonedPosition)
         {
             m_attacker = attacker;
             m_time = 0f;
@@ -744,19 +743,19 @@ namespace HarpoonExtended
             m_staminaDrain = 0.1f * drainStamina.Value;
             m_pullSpeed = pullSpeed.Value;
             m_smoothDistance = smoothDistance.Value;
-            m_ship = hitObject.GetComponent<Ship>();
+            m_ship = hitObject.GetComponentInParent<Ship>();
             m_lineRenderer = null;
             isPullingTo = false;
 
-            objectRbody = hitObject.GetComponent<Rigidbody>() ?? hitObject.GetComponentInChildren<Rigidbody>();
-            attackerRbody = attacker.GetComponent<Rigidbody>() ?? attacker.GetComponentInChildren<Rigidbody>();
+            objectRbody = hitObject.GetComponentInParent<Rigidbody>() ?? hitObject.GetComponentInChildren<Rigidbody>();
+            attackerRbody = attacker.GetComponentInParent<Rigidbody>() ?? attacker.GetComponentInChildren<Rigidbody>();
 
             objectMass = CalculateHitObjectMass(hitObject);
 
-            m_nview = hitObject.GetComponent<ZNetView>();
-            m_character = hitObject.GetComponent<Character>();
+            m_nview = hitObject.GetComponentInParent<ZNetView>();
+            m_character = hitObject.GetComponentInParent<Character>();
 
-            if ((bool)hitObject.GetComponent<RandomFlyingBird>())
+            if ((bool)hitObject.GetComponentInParent<RandomFlyingBird>())
             {
                 // Bird doesn't have rigidbody but is not stational
                 if (deepLoggingEnabled.Value) LogInfo("Pull to bird");
@@ -812,11 +811,15 @@ namespace HarpoonExtended
             {
                 if (deepLoggingEnabled.Value) LogInfo("Move owned");
             }
-            else
+            else if (m_nview.IsValid())
             {
                 // screw it take ownership and move
                 if (deepLoggingEnabled.Value) LogInfo("Claim ownership and movе");
                 m_nview.ClaimOwnership();
+            }
+            else
+            {
+                return;
             }
 
             if ((bool)hitObject.GetComponent<ItemDrop>())
@@ -843,6 +846,8 @@ namespace HarpoonExtended
                 m_minDistance = minDistancePullToTarget.Value;
             else
                 m_minDistance = minDistancePullToPlayer.Value;
+
+            harpooned = Instantiate(ZNetScene.instance.GetPrefab("vfx_Harpooned"), harpoonedPosition, Quaternion.identity, hitObject.transform);
 
             LineConnect component = harpooned.GetComponent<LineConnect>();
             if ((bool)component)
