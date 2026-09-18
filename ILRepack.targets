@@ -1,24 +1,24 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Target Name="ILRepacker" AfterTargets="Build">
-		<ItemGroup>
-			<InputAssemblies Include="$(TargetPath)" />
-			<InputAssemblies Include="$(OutputPath)\ServerSync.dll" />
-		</ItemGroup>
-		<ILRepack Parallel="true" DebugInfo="true" Internalize="true" InputAssemblies="@(InputAssemblies)" OutputFile="$(TargetPath)" TargetKind="SameAsPrimaryAssembly" LibraryPath="$(OutputPath)" />
-	</Target>
-	<Target Name="CopyDLLPackage" AfterTargets="ILRepacker">
-		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)package\thunderstore\$(SolutionName)\" />
-		<Message Text="Copied to package folder." Importance="High" />
-	</Target>
-	<Target Name="CopyDLLPlugins" AfterTargets="ILRepacker">
-		<Copy SourceFiles="$(TargetPath)" DestinationFolder="F:\Steam\steamapps\common\Valheim\BepInEx\plugins\" />
-		<Message Text="Copied to plugins folder." Importance="High" />
-	</Target>
-	<Target Name="ZipOutputPath" AfterTargets="CopyDLLPackage">
-		<ZipDirectory
-				SourceDirectory="$(ProjectDir)package\thunderstore\$(SolutionName)\"
-				DestinationFile="$(ProjectDir)package\thunderstore\$(SolutionName).zip"
-				Overwrite="true"/>
-	</Target>
+  <!-- The historical filename is retained; no dependency is embedded or ILRepacked. -->
+  <PropertyGroup>
+    <HarpoonPackageSource>$(ProjectDir)package\thunderstore\HarpoonExtended\</HarpoonPackageSource>
+    <HarpoonPackageStage>$(ProjectDir)obj\$(Configuration)\HarpoonPackage\</HarpoonPackageStage>
+    <R2ModmanProfilePath Condition="'$(R2ModmanProfilePath)' == ''">$(AppData)\r2modmanPlus-local\Valheim\profiles\beta</R2ModmanProfilePath>
+  </PropertyGroup>
+  <Target Name="CopyDLLPackage" AfterTargets="Build">
+    <ItemGroup>
+      <HarpoonPackageFiles Include="$(TargetPath);$(HarpoonPackageSource)manifest.json;$(HarpoonPackageSource)README.md;$(HarpoonPackageSource)CHANGELOG.md;$(HarpoonPackageSource)icon.png" />
+    </ItemGroup>
+    <RemoveDir Directories="$(HarpoonPackageStage)" />
+    <MakeDir Directories="$(HarpoonPackageStage)" />
+    <Copy SourceFiles="@(HarpoonPackageFiles)" DestinationFolder="$(HarpoonPackageStage)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HarpoonPackageSource)" />
+    <ZipDirectory SourceDirectory="$(HarpoonPackageStage)" DestinationFile="$(ProjectDir)package\thunderstore\HarpoonExtended.zip" Overwrite="true" />
+    <Message Text="Created HarpoonExtended.zip. Standalone dependencies are not included." Importance="High" />
+  </Target>
+  <Target Name="CopyDLLPlugins" AfterTargets="CopyDLLPackage" Condition="Exists('$(R2ModmanProfilePath)\BepInEx\plugins')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(R2ModmanProfilePath)\BepInEx\plugins\shudnal-HarpoonExtended\" />
+    <Message Text="Copied HarpoonExtended.dll to the selected r2modman profile." Importance="High" />
+  </Target>
 </Project>
