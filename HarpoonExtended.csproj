@@ -13,7 +13,7 @@
     <LangVersion>10.0</LangVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
-    <AssembliesPath Condition="'$(AssembliesPath)' == ''">$(ProjectDir)..\Assemblies</AssembliesPath>
+    <AssembliesPath Condition="'$(AssembliesPath)' == ''">$(MSBuildProjectDirectory)\..\Assemblies</AssembliesPath>
     <GameAssembliesPath Condition="'$(GameAssembliesPath)' == ''">$(AssembliesPath)\stable</GameAssembliesPath>
     <PublicizedAssembliesPath Condition="'$(PublicizedAssembliesPath)' == ''">$(GameAssembliesPath)\publicized_assemblies</PublicizedAssembliesPath>
     <ConditionalConfigSyncPath Condition="'$(ConditionalConfigSyncPath)' == ''">$(AssembliesPath)\Managers\ConditionalConfigSync.dll</ConditionalConfigSyncPath>

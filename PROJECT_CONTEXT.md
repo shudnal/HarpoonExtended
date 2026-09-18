@@ -38,3 +38,17 @@ No mod build, automated runtime tests, game launch or multiplayer test was perfo
 ## Deferred work
 
 See `docs/REWORK_NOTES.md`. The notes preserve decisions and ideas only; they are not implemented by this maintenance branch.
+
+## Build-target and ancestry follow-up
+
+The reported intermittent MSB3023 message identifies a Copy task with no evaluated destination, but the failing target and local import state are unknown without the error's file/line or a build log. All three Copy declarations in the baseline targets file specify a destination, so the message alone does not establish which call failed or why its value became empty. This follow-up hardens this project's packaging path without claiming a reproduced root cause.
+
+* Package and profile-copy targets now have project-specific names: `HarpoonExtendedPackage` and `HarpoonExtendedDeployToProfile`.
+* Paths are evaluated inside the executing targets using `MSBuildProjectDirectory`; the default assembly-reference base uses the same reserved property instead of `ProjectDir`.
+* Design-time builds and invocations explicitly skipping compiler execution or project building do not package or deploy artifacts.
+* Every Copy has explicit destination files. Required output names, destinations and package inputs are validated before copying. Failures use `HEBUILD001` through `HEBUILD004` with the evaluated values.
+* Build output logs the actual package and optional profile-copy paths. An absent r2modman profile skips only deployment, never package creation. Existing package contents, output locations and the `R2ModmanProfilePath` override remain supported.
+
+If MSB3023 persists, inspect the complete error including its targets-file path and line, together with the preceding `HarpoonExtended packaging` / `HarpoonExtended profile copy` messages. An imported or standard Copy task must be diagnosed at its actual call site rather than hidden with ContinueOnError. No build or game test was run for this follow-up; validation was limited to XML structure and static source review.
+
+`Transform.IsChildOf` is intentionally retained in participant-destruction checks. In the referenced game source, `Utils.IsAncestor(this Transform t, Transform possibleAncestor)` is a recursive parent walk with an initial equality check, not a network-aware or destruction-safe helper. For the non-null transforms guarded by this code, both calls include the transform itself and descendants of any depth. There is no correctness reason to replace the Unity API here, and no performance claim is made without measurement.
