@@ -7,7 +7,7 @@ Harpoon movable objects, retrieve or release the line, and pull yourself to immo
 
 ## Installation
 
-Install the same compatible Harpoon Extended version on the server and every client. Version 1.1.13 requires:
+Install the same compatible Harpoon Extended version on the server and every client. Version 1.2.0 requires:
 
 * BepInExPack Valheim 5.4.2350 or later;
 * Conditional Config Sync 1.0.5 or later, including both of its standalone DLLs.
@@ -79,21 +79,6 @@ Destroyed or unloaded participants, missing required rope components and invalid
 ## Configuration
 
 Use a compatible BepInEx configuration manager or edit `BepInEx/config/shudnal.HarpoonExtended.cfg`. Server-controlled values are synchronized by Conditional Config Sync. Client-local shortcuts and presentation settings stay local.
-
-## Building from source
-
-Use Visual Studio with the .NET Framework 4.8 targeting pack. References default to the existing sibling `Assemblies` layout:
-
-* `../Assemblies/stable/publicized_assemblies`: publicized game assemblies, accepting filenames with or without the `_publicized` suffix;
-* `../Assemblies/stable`: Unity assemblies from the same Valheim installation;
-* `../Assemblies/Harmony`: BepInEx and Harmony;
-* `../Assemblies/Managers/ConditionalConfigSync.dll`: the standalone CCS API assembly.
-
-Override `AssembliesPath`, `GameAssembliesPath`, `PublicizedAssembliesPath` or `ConditionalConfigSyncPath` through MSBuild properties as needed. The game API reference for this change is Valheim **1.0.15** (`assemblies_combined` commit `d1374bfd9175ac8f733ae483b0a06e5c8b75906e`).
-
-Build `HarpoonExtended.sln` in Release. The assembly is written to `bin/Release`, and packaging produces `package/thunderstore/HarpoonExtended.zip` from an explicit clean staging list. No game or dependency DLL is bundled. If the local r2modman `beta` profile exists, the assembly is also copied there; override `R2ModmanProfilePath` to select a different profile or a nonexistent path to disable that copy.
-
-This maintenance change was reviewed statically, not built or play-tested. See [manual verification](docs/MANUAL_VERIFICATION.md) before publishing.
 
 ## Links
 

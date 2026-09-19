@@ -1,7 +1,7 @@
-# 1.1.13
+# 1.2.0
 * Updated for Valheim 1.0.15.
 * Switched to standalone Conditional Config Sync; the mod is now required on the server and clients. Removed the Enabled setting.
-* Added an independent Feather Fall effect with configurable maximum fall speed and fall damage multiplier, defaulting to 5 m/s and zero base fall damage.
+* Added an independent Feather Fall effect with configurable maximum fall speed and fall damage multiplier, defaulting to 7 m/s and zero base fall damage.
 * Added prefab whitelist and blacklist settings and support for GrapplingBlocker. Forbidden targets still receive normal projectile hits without a rope.
 * Fixed dangling ropes when participants or required components are destroyed or unloaded, and checked break distance before applying pulling force.
 * Fixed maximum attachment distance using an outdated value on the first hit or after a setting change.

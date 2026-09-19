@@ -35,14 +35,13 @@
     <ZipDirectory SourceDirectory="$(_HarpoonExtendedPackageStage)"
                   DestinationFile="$(_HarpoonExtendedPackageArchive)"
                   Overwrite="true" />
-    <Message Text="Created HarpoonExtended.zip. Standalone dependencies are not included." Importance="High" />
   </Target>
   <Target Name="HarpoonExtendedDeployToProfile"
           AfterTargets="HarpoonExtendedPackage"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' != 'false' and '$(SkipCompilerExecution)' != 'true'">
     <PropertyGroup>
       <_HarpoonExtendedProfilePath>$(R2ModmanProfilePath)</_HarpoonExtendedProfilePath>
-      <_HarpoonExtendedProfilePath Condition="'$(_HarpoonExtendedProfilePath)' == '' and '$(AppData)' != ''">$(AppData)\r2modmanPlus-local\Valheim\profiles\beta</_HarpoonExtendedProfilePath>
+      <_HarpoonExtendedProfilePath Condition="'$(_HarpoonExtendedProfilePath)' == ''">D:\r2modman\Valheim\profiles\beta</_HarpoonExtendedProfilePath>
       <_HarpoonExtendedProfileCopyEnabled>false</_HarpoonExtendedProfileCopyEnabled>
       <_HarpoonExtendedProfileCopyEnabled Condition="'$(_HarpoonExtendedProfilePath)' != '' and Exists('$(_HarpoonExtendedProfilePath)\BepInEx\plugins')">true</_HarpoonExtendedProfileCopyEnabled>
       <_HarpoonExtendedProfileDestination />
@@ -52,7 +51,7 @@
            Code="HEBUILD004"
            Text="HarpoonExtended profile copy has an empty source or destination. Source='$(TargetPath)', FileName='$(TargetFileName)', Destination='$(_HarpoonExtendedProfileDestination)'." />
     <Message Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true'"
-             Text="HarpoonExtended profile copy: Source='$(TargetPath)', Destination='$(_HarpoonExtendedProfileDestination)'."
+             Text="Copied to r2 folder $(_HarpoonExtendedProfileDestination)."
              Importance="High" />
     <Copy Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true'"
           SourceFiles="$(TargetPath)"

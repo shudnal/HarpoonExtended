@@ -14,7 +14,7 @@ namespace HarpoonExtended
     {
         internal const string pluginID = "shudnal.HarpoonExtended";
         internal const string pluginName = "Harpoon Extended";
-        internal const string pluginVersion = "1.1.13";
+        internal const string pluginVersion = "1.2.0";
 
         private readonly Harmony harmony = new Harmony(pluginID);
         internal static readonly ConfigSync configSync = new ConfigSync(pluginID)
@@ -174,8 +174,8 @@ namespace HarpoonExtended
             pullUnderWater = config("6 - Misc", "Pull to underwater", true, "Pull to underwater terrain.");
             removeSlowFallWithoutHarpoon = config("6 - Misc", "Remove Feather Fall without harpoon", false, "Remove Feather Fall if harpoon is not equipped.");
             removeSlowFallonGroundThreshold = config("6 - Misc", "Remove Feather Fall after seconds on ground", 2f, "Remove Feather Fall if a player stays without harpoon line on the ground for set amount of seconds.");
-            slowFallSpeed = config("6 - Misc", "Feather Fall maximum fall speed", 5f, new ConfigDescription("Maximum downward speed in meters per second. Zero disables the speed limit. Applied only when the harpoon's own Feather Fall effect is added.", new AcceptableValueRange<float>(0f, float.MaxValue)));
-            slowFallDamageMultiplier = config("6 - Misc", "Feather Fall damage multiplier", 0f, new ConfigDescription("Fall damage multiplier: 0 prevents base fall damage, 0.5 halves it, 1 leaves it unchanged. Other status effects still contribute normally. Applied only when the harpoon's own Feather Fall effect is added.", new AcceptableValueRange<float>(0f, float.MaxValue)));
+            slowFallSpeed = config("6 - Misc", "Feather Fall maximum fall speed", 7f, "Maximum downward speed in meters per second. Zero disables the speed limit. Applied only when the harpoon's own Feather Fall effect is added.");
+            slowFallDamageMultiplier = config("6 - Misc", "Feather Fall damage multiplier", 0f, new ConfigDescription("Fall damage multiplier: 0 prevents base fall damage, 0.5 halves it, 1 leaves it unchanged. Other status effects still contribute normally. Applied only when the harpoon's own Feather Fall effect is added.", new AcceptableValueRange<float>(0f, 1f)));
 
             targetPulling = config("3 - Pull", "Enable pulling", true, "Enable active pulling harpooned target or yourself. Hold Use button to retrieve line or Crouch + Use buttons to cast line.");
             pullSpeedMultiplier = config("3 - Pull", "Harpoon line casting and retrieving speed multiplier", 1f, "Speed of line casting and retrieving");
@@ -343,6 +343,9 @@ namespace HarpoonExtended
 
         private static void PatchInventory(Inventory inventory)
         {
+            if (inventory.m_temoraryInventory)
+                return;
+
             List<ItemDrop.ItemData> items = new List<ItemDrop.ItemData>();
             inventory.GetAllItems(itemDropNameSpearChitin, items);
             foreach (ItemDrop.ItemData item in items)
@@ -352,11 +355,18 @@ namespace HarpoonExtended
             }
         }
 
-        [HarmonyPatch(typeof(Inventory), nameof(Inventory.Load))]
-        public static class Inventory_Load_HarpoonStats
+        [HarmonyPatch]
+        private static class Inventory_Load_HarpoonStats
         {
+            private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+            {
+                yield return AccessTools.Method(typeof(Inventory), nameof(Inventory.Load), new[] { typeof(ZPackage), typeof(bool) });
+                yield return AccessTools.Method(typeof(Inventory), nameof(Inventory.Load), new[] { typeof(ZPackage) });
+            }
+
             private static void Postfix(Inventory __instance) => PatchInventory(__instance);
         }
+
 
         [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Start))]
         public static class ItemDrop_Start_HarpoonStats
