@@ -1,24 +1,64 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Target Name="ILRepacker" AfterTargets="Build">
-		<ItemGroup>
-			<InputAssemblies Include="$(TargetPath)" />
-			<InputAssemblies Include="$(OutputPath)\ServerSync.dll" />
-		</ItemGroup>
-		<ILRepack Parallel="true" DebugInfo="true" Internalize="true" InputAssemblies="@(InputAssemblies)" OutputFile="$(TargetPath)" TargetKind="SameAsPrimaryAssembly" LibraryPath="$(OutputPath)" />
-	</Target>
-	<Target Name="CopyDLLPackage" AfterTargets="ILRepacker">
-		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)package\thunderstore\$(SolutionName)\" />
-		<Message Text="Copied to thunderstore package folder." Importance="High" />
-	</Target>
-	<Target Name="ZipOutputPath" AfterTargets="CopyDLLPackage">
-		<ZipDirectory
-				SourceDirectory="$(ProjectDir)package\thunderstore\$(SolutionName)\"
-				DestinationFile="$(ProjectDir)package\thunderstore\$(SolutionName).zip"
-				Overwrite="true"/>
-	</Target>
-	<Target Name="CopyDLLPlugins" AfterTargets="ILRepacker">
-		<Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\Users\Suden\AppData\Roaming\r2modmanPlus-local\Valheim\profiles\beta\BepInEx\plugins\shudnal-$(SolutionName)\" />
-		<Message Text="Copied to plugins folder." Importance="High" />
-	</Target>
+  <!-- The historical filename is retained; no dependency is embedded or ILRepacked. -->
+  <!-- Project-specific target names avoid replacing similarly named imported targets. -->
+  <Target Name="HarpoonExtendedPackage"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' != 'false' and '$(SkipCompilerExecution)' != 'true'">
+    <!-- Resolve paths when the target executes, not in an earlier project evaluation. -->
+    <PropertyGroup>
+      <_HarpoonExtendedPackageSource>$(MSBuildProjectDirectory)\package\thunderstore\HarpoonExtended\</_HarpoonExtendedPackageSource>
+      <_HarpoonExtendedPackageStage>$(MSBuildProjectDirectory)\obj\$(Configuration)\HarpoonPackage\</_HarpoonExtendedPackageStage>
+      <_HarpoonExtendedPackageArchive>$(MSBuildProjectDirectory)\package\thunderstore\HarpoonExtended.zip</_HarpoonExtendedPackageArchive>
+    </PropertyGroup>
+    <Error Condition="'$(TargetPath)' == '' or '$(TargetFileName)' == ''"
+           Code="HEBUILD001"
+           Text="HarpoonExtended packaging requires a completed build with nonempty TargetPath and TargetFileName. Configuration='$(Configuration)', Platform='$(Platform)', TargetPath='$(TargetPath)', TargetFileName='$(TargetFileName)'." />
+    <Error Condition="'$(_HarpoonExtendedPackageSource)' == '' or '$(_HarpoonExtendedPackageStage)' == '' or '$(_HarpoonExtendedPackageArchive)' == ''"
+           Code="HEBUILD002"
+           Text="HarpoonExtended packaging destination is empty. Source='$(_HarpoonExtendedPackageSource)', Stage='$(_HarpoonExtendedPackageStage)', Archive='$(_HarpoonExtendedPackageArchive)'." />
+    <ItemGroup>
+      <_HarpoonExtendedPackageFiles Remove="@(_HarpoonExtendedPackageFiles)" />
+      <_HarpoonExtendedPackageFiles Include="$(TargetPath);$(_HarpoonExtendedPackageSource)manifest.json;$(_HarpoonExtendedPackageSource)README.md;$(_HarpoonExtendedPackageSource)CHANGELOG.md;$(_HarpoonExtendedPackageSource)icon.png" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(_HarpoonExtendedPackageFiles.Identity)')"
+           Code="HEBUILD003"
+           Text="HarpoonExtended packaging input does not exist: '%(_HarpoonExtendedPackageFiles.Identity)'." />
+    <Message Text="HarpoonExtended packaging: DLL='$(TargetPath)', Stage='$(_HarpoonExtendedPackageStage)', Archive='$(_HarpoonExtendedPackageArchive)'." Importance="High" />
+    <RemoveDir Directories="$(_HarpoonExtendedPackageStage)" />
+    <MakeDir Directories="$(_HarpoonExtendedPackageStage)" />
+    <Copy SourceFiles="@(_HarpoonExtendedPackageFiles)"
+          DestinationFiles="@(_HarpoonExtendedPackageFiles->'$(_HarpoonExtendedPackageStage)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFiles="$(_HarpoonExtendedPackageSource)$(TargetFileName)"
+          SkipUnchangedFiles="true" />
+    <ZipDirectory SourceDirectory="$(_HarpoonExtendedPackageStage)"
+                  DestinationFile="$(_HarpoonExtendedPackageArchive)"
+                  Overwrite="true" />
+  </Target>
+  <Target Name="HarpoonExtendedDeployToProfile"
+          AfterTargets="HarpoonExtendedPackage"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' != 'false' and '$(SkipCompilerExecution)' != 'true'">
+    <PropertyGroup>
+      <_HarpoonExtendedProfilePath>$(R2ModmanProfilePath)</_HarpoonExtendedProfilePath>
+      <_HarpoonExtendedProfilePath Condition="'$(_HarpoonExtendedProfilePath)' == ''">D:\r2modman\Valheim\profiles\beta</_HarpoonExtendedProfilePath>
+      <_HarpoonExtendedProfileCopyEnabled>false</_HarpoonExtendedProfileCopyEnabled>
+      <_HarpoonExtendedProfileCopyEnabled Condition="'$(_HarpoonExtendedProfilePath)' != '' and Exists('$(_HarpoonExtendedProfilePath)\BepInEx\plugins')">true</_HarpoonExtendedProfileCopyEnabled>
+      <_HarpoonExtendedProfileDestination />
+      <_HarpoonExtendedProfileDestination Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true'">$(_HarpoonExtendedProfilePath)\BepInEx\plugins\shudnal-HarpoonExtended\$(TargetFileName)</_HarpoonExtendedProfileDestination>
+    </PropertyGroup>
+    <Error Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true' and ('$(TargetPath)' == '' or '$(TargetFileName)' == '' or '$(_HarpoonExtendedProfileDestination)' == '')"
+           Code="HEBUILD004"
+           Text="HarpoonExtended profile copy has an empty source or destination. Source='$(TargetPath)', FileName='$(TargetFileName)', Destination='$(_HarpoonExtendedProfileDestination)'." />
+    <Message Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true'"
+             Text="Copied to r2 folder $(_HarpoonExtendedProfileDestination)."
+             Importance="High" />
+    <Copy Condition="'$(_HarpoonExtendedProfileCopyEnabled)' == 'true'"
+          SourceFiles="$(TargetPath)"
+          DestinationFiles="$(_HarpoonExtendedProfileDestination)"
+          SkipUnchangedFiles="true" />
+    <Message Condition="'$(_HarpoonExtendedProfileCopyEnabled)' != 'true'"
+             Text="Skipped HarpoonExtended profile copy: no existing BepInEx plugins directory under '$(_HarpoonExtendedProfilePath)'."
+             Importance="Normal" />
+  </Target>
 </Project>
