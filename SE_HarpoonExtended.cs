@@ -438,7 +438,7 @@ namespace HarpoonExtended
             Vector3 normalized = vector.normalized;
             float num = Mathf.Clamp01((magnitude - targetDistance) / smoothDistance);
             num = (float)Math.Pow(num, power);
-            Vector3 b = Vector3.Project(body.velocity, normalized.normalized);
+            Vector3 b = Vector3.Project(body.linearVelocity, normalized.normalized);
             Vector3 a = normalized.normalized * speed - b;
             if (noUpForce && a.y > 0f)
                 a.y = 0f;
@@ -467,7 +467,7 @@ namespace HarpoonExtended
             else
                 body.AddForce(force2, mode);
 
-            body.velocity = Vector3.ClampMagnitude(body.velocity, maximumVelocity.Value);
+            body.linearVelocity = Vector3.ClampMagnitude(body.linearVelocity, maximumVelocity.Value);
 
             return num;
         }

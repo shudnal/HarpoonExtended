@@ -99,7 +99,6 @@
   <ItemGroup>
     <None Include="ILRepack.targets" />
     <None Include="README.md" />
-    <None Include="PROJECT_CONTEXT.md" />
     <None Include="LICENSE.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
