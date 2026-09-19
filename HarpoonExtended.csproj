@@ -100,8 +100,6 @@
     <None Include="ILRepack.targets" />
     <None Include="README.md" />
     <None Include="PROJECT_CONTEXT.md" />
-    <None Include="docs\REWORK_NOTES.md" />
-    <None Include="docs\MANUAL_VERIFICATION.md" />
     <None Include="LICENSE.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
