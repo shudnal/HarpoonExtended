@@ -126,6 +126,7 @@ namespace HarpoonExtended
             ConfigInit();
             configSync.AddLockingConfigEntry(configLocked);
             harmony.PatchAll();
+            Game.isModded = true;
         }
 
         private void OnDestroy()
@@ -406,7 +407,7 @@ namespace HarpoonExtended
                 m_nview.ClaimOwnership();
                 return false;
             }
-        }
+        }*/
 
         public static void SetHarpooned(Player attacker, GameObject hitObject, Vector3 hitPoint, bool pullTo, Collider collider)
         {
