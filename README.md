@@ -43,7 +43,7 @@ The harpoon uses its own copy of the vanilla SlowFall effect. It retains the ori
 
 Settings in `6 - Misc`:
 
-* `Feather Fall maximum fall speed`: default **5 m/s**. Zero disables this effect's speed limit.
+* `Feather Fall maximum fall speed`: default **7 m/s**. Zero disables this effect's speed limit.
 * `Feather Fall damage multiplier`: default **0**, preventing base fall damage. `0.5` halves base damage and `1` leaves it unchanged. Other effects still contribute normally.
 
 The two values are captured only when a new harpoon Feather Fall effect is added. Editing the configuration does not modify an already active effect. Reusing an active effect also keeps its existing values.

@@ -100,13 +100,6 @@
     <None Include="README.md" />
     <None Include="LICENSE.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task">
-      <Version>2.0.46</Version>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="ValidateConditionalConfigSyncReference" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="!Exists('$(ConditionalConfigSyncPath)')" Text="ConditionalConfigSync.dll was not found. Install CCS 1.0.5 or later and set ConditionalConfigSyncPath to its standalone API DLL." />

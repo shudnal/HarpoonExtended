@@ -7,7 +7,7 @@ Harpoon movable objects, retrieve or release the line, and pull yourself to immo
 
 ## Installation
 
-Install the same compatible Harpoon Extended version on the server and every client. Version 1.1.13 requires:
+Install the same compatible Harpoon Extended version on the server and every client. Version 1.2.0 requires:
 
 * BepInExPack Valheim 5.4.2350 or later;
 * Conditional Config Sync 1.0.5 or later, including both of its standalone DLLs.
