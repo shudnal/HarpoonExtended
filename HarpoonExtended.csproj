@@ -44,7 +44,6 @@
     <Compile Include="HarpoonValidation.cs" />
     <Compile Include="HarpoonLine.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SE_HarpoonExtended.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
