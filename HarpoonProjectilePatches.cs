@@ -32,9 +32,46 @@ namespace HarpoonExtended
         private static bool IsHarpoonProjectile(Projectile projectile)
             => projectile != null && projectile.name.StartsWith("projectile_chitinharpoon", StringComparison.Ordinal);
 
+        private static bool IsPlayerHarpoonForbidden(Character character)
+        {
+            if (character == null || !character.IsPlayer())
+                return false;
+            if (!targetPlayers.Value)
+                return true;
+            // Check inventory weight only on the target's client, where it is authoritative.
+            if (character == Player.m_localPlayer && character.IsEncumbered())
+                return true;
+            // The joint only exists on the cart owner. Also run this check on the
+            // target's client when adding/updating SE_Harpooned, not just on impact.
+            foreach (Vagon vagon in Vagon.m_instances)
+            {
+                if (vagon == null || vagon.m_attachJoin == null)
+                    continue;
+                Rigidbody connectedBody = vagon.m_attachJoin.connectedBody;
+                if (connectedBody != null && connectedBody.gameObject == character.gameObject)
+                    return true;
+            }
+            return false;
+        }
+
+        [HarmonyPatch(typeof(SEMan), nameof(SEMan.AddStatusEffect), new[] { typeof(StatusEffect), typeof(bool), typeof(int), typeof(float), typeof(short) })]
+        public static class SEMan_AddStatusEffect_PlayerHarpoonTargets
+        {
+            private static bool Prefix(StatusEffect statusEffect, Character ___m_character, ref StatusEffect __result)
+            {
+                if (!(statusEffect is SE_Harpooned) || !IsPlayerHarpoonForbidden(___m_character))
+                    return true;
+                // Reject on the receiving client before Setup spawns the rope.
+                __result = null;
+                return false;
+            }
+        }
+
         private static bool IsRopeForbidden(GameObject target, Collider collider)
         {
             if (target == null || collider == null || target.GetComponentInParent<GrapplingBlocker>() != null || collider.GetComponentInParent<GrapplingBlocker>() != null)
+                return true;
+            if (IsPlayerHarpoonForbidden(target.GetComponentInParent<Character>()))
                 return true;
             ZNetView view = target.GetComponentInParent<ZNetView>();
             GameObject prefab = view != null && view.IsValid() && ZNetScene.instance != null ? ZNetScene.instance.GetPrefab(view.GetZDO().GetPrefab()) : null;

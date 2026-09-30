@@ -14,7 +14,7 @@ namespace HarpoonExtended
     {
         internal const string pluginID = "shudnal.HarpoonExtended";
         internal const string pluginName = "Harpoon Extended";
-        internal const string pluginVersion = "1.2.0";
+        internal const string pluginVersion = "1.2.1";
 
         private readonly Harmony harmony = new Harmony(pluginID);
         internal static readonly ConfigSync configSync = new ConfigSync(pluginID)
@@ -43,6 +43,7 @@ namespace HarpoonExtended
         public static ConfigEntry<float> maxBodyMassToPull;
         public static ConfigEntry<float> containerInventoryWeightMassFactor;
         public static ConfigEntry<bool> targetCreatures;
+        public static ConfigEntry<bool> targetPlayers;
         public static ConfigEntry<bool> targetShip;
         public static ConfigEntry<bool> targetTreeLog;
         public static ConfigEntry<bool> targetTreeBase;
@@ -151,6 +152,7 @@ namespace HarpoonExtended
             loggingEnabled = config("1 - General", "Logging enabled", false, "Enable logging for debug events. [Not Synced with Server]", false);
 
             targetCreatures = config("2 - Targets", "Creatures (override)", true, "Enable pulling creatures. Overrides vanilla behaviour. Restart required after change.");
+            targetPlayers = config("2 - Targets", "Players", true, "Enable harpooning other players. Independent of Creatures (override). Players attached to a cart or carrying too much weight cannot be harpooned. Disabling this setting also releases existing player harpoons. Hits, damage and vanilla PvP rules are unchanged.");
             targetShip = config("2 - Targets", "Ship", true, "Enable pulling ships.");
             targetTreeLog = config("2 - Targets", "Tree log", true, "Enable pulling logs.");
             targetTreeBase = config("2 - Targets", "Trees", true, "Enable pulling to trees.");
@@ -236,6 +238,16 @@ namespace HarpoonExtended
         [HarmonyPatch(typeof(SE_Harpooned), nameof(SE_Harpooned.UpdateStatusEffect))]
         public static class SE_Harpooned_UpdateStatusEffect_HarpoonPull
         {
+            [HarmonyPriority(Priority.First)]
+            private static bool Prefix(Character ___m_character, ref bool ___m_broken)
+            {
+                if (!IsPlayerHarpoonForbidden(___m_character))
+                    return true;
+                // Stop before vanilla applies force. SEMan then removes the effect via IsDone/Stop.
+                ___m_broken = true;
+                return false;
+            }
+
             [HarmonyPriority(Priority.First)]
             private static void Postfix(SE_Harpooned __instance, float dt, Character ___m_attacker, Character ___m_character, ref float ___m_baseDistance)
             {

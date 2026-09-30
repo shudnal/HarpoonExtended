@@ -1,3 +1,7 @@
+# 1.2.1
+* New config for player targeting
+* Prevented pulling if targeted player is encumbered or attached to cart
+
 # 1.2.0
 * Updated for Valheim 1.0.15.
 * Switched to standalone Conditional Config Sync; the mod is now required on the server and clients. Removed the Enabled setting.
